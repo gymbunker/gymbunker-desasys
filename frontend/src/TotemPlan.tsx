@@ -396,7 +396,7 @@ export default function TotemPlan() {
             >
               <img src="/bunker.png" alt="Bunker Gym Logo" className="w-44 h-44 object-contain filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)] drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" />
               <div className="text-center">
-                <h1 className="text-3xl font-black tracking-tight" style={{color:'#F38E26'}}>FUSION FITNESS</h1>
+                <h1 className="text-3xl font-black tracking-tight" style={{color:'#F38E26'}}>BUNKER GYM</h1>
                 <p className={`text-sm font-semibold tracking-[0.2em] uppercase mt-1 ${muted}`}>Totem de Entrenamiento</p>
               </div>
             </motion.div>

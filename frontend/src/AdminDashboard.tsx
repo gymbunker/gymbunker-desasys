@@ -1334,16 +1334,16 @@ export default function AdminDashboard() {
 
     // Set Metadata for specific filename on download
     doc.setProperties({
-      title: "FusionFitnessGYM_Terminos_Y_Condiciones",
+      title: "BunkerGYM_Terminos_Y_Condiciones",
       subject: "Términos y Condiciones de Uso",
-      author: "Fusion Fitness GYM"
+      author: "BUNKER GYM"
     });
 
     // Open in new tab using Blob URL
     const blob = doc.output('blob');
     const url = URL.createObjectURL(blob);
     const win = window.open(url, '_blank');
-    if (win) win.document.title = "Fusion Fitness GYM - Términos y Condiciones";
+    if (win) win.document.title = "BUNKER GYM - Términos y Condiciones";
   };
 
   useEffect(() => { if (isAuthenticated) refreshData(); }, [isAuthenticated, startDate, endDate]);
@@ -1764,7 +1764,7 @@ export default function AdminDashboard() {
 
     doc.setFontSize(22);
     doc.setTextColor(249, 115, 22);
-    doc.text('FUSION FITNESS GYM', 105, 20, { align: 'center' });
+    doc.text('BUNKER GYM', 105, 20, { align: 'center' });
     
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
@@ -1818,7 +1818,7 @@ export default function AdminDashboard() {
     doc.setFontSize(10);
     doc.setTextColor(150);
     doc.text('---------------------------------------------------------', 105, finalY + 20, { align: 'center' });
-    doc.text('Sello Institucional - Fusion Fitness', 105, finalY + 26, { align: 'center' });
+    doc.text('Sello Institucional - Bunker Gym', 105, finalY + 26, { align: 'center' });
 
     try {
       const logo = await loadImage('/bunker.png');
@@ -1902,11 +1902,10 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-100 dark:bg-[#050505] flex flex-col items-center justify-center p-4 overflow-hidden transition-colors duration-300">
         <div className="absolute top-4 right-4"><button onClick={() => setIsDarkMode(!isDarkMode)} className="p-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-full text-black dark:text-white shadow-lg transition-all">{isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
         <div className="w-full max-w-[380px] bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-10 rounded-[40px] backdrop-blur-3xl shadow-2xl animate-in zoom-in duration-500">
-          <div className="flex justify-center mb-6">
-            <img src="/bunker.png" alt="Bunker Gym Logo" className="h-24 w-auto object-contain drop-shadow-xl" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+          <div className="flex justify-center mb-8">
+            <img src="/bunker.png" alt="Bunker Gym Logo" className="h-32 w-auto object-contain drop-shadow-xl" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
             <div className="hidden p-4 bg-orange-500 rounded-2xl shadow-xl shadow-orange-500/30"><ShieldCheck size={32} className="text-black dark:text-white" /></div>
           </div>
-          <h2 className="text-2xl font-black text-center mb-8 tracking-tighter uppercase font-sans"><span className="text-black dark:text-white">Fusion</span> <span className="text-orange-500">Fitness</span></h2>
           
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-[9px] font-black uppercase mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -2166,10 +2165,9 @@ export default function AdminDashboard() {
 
       <aside className="w-40 h-full border-r border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-black/40 backdrop-blur-3xl flex flex-col p-4 shrink-0">
         <div className="flex flex-col gap-4 mb-8">
-          <div className="flex items-center gap-2">
-            <img src="/bunker.png" alt="Bunker Gym Logo" className="w-8 h-8 object-contain drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
-            <div className="hidden w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg"><Brain size={16} className="text-black dark:text-white" /></div>
-            <h1 className="text-[11px] font-black tracking-tighter uppercase leading-tight"><span className="text-black dark:text-white">Fusion</span> <br/><span className="text-orange-500">Fitness</span></h1>
+          <div className="flex justify-center mb-4">
+            <img src="/bunker.png" alt="Bunker Gym Logo" className="w-24 h-auto object-contain drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+            <div className="hidden w-16 h-16 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg"><Brain size={24} className="text-black dark:text-white" /></div>
           </div>
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-center gap-2 p-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-black dark:text-white shadow-sm transition-all hover:scale-[1.02]">
             {isDarkMode ? <Sun size={12}/> : <Moon size={12}/>}
@@ -2207,13 +2205,13 @@ export default function AdminDashboard() {
         </nav>
         <button onClick={() => { localStorage.removeItem('gym_session'); localStorage.removeItem('gym_role'); localStorage.removeItem('gym_user'); setIsAuthenticated(false); setLoggedUser(null); }} className="w-full p-2 bg-red-500/10 hover:bg-red-500 rounded-xl text-red-500 hover:text-black dark:hover:text-white text-[9px] font-black uppercase tracking-widest transition-all mt-4">Salir</button>
         <div className="mt-4 text-center text-[7px] font-black uppercase tracking-wider text-gray-400 dark:text-white/20 select-none">
-          Fusion Fitness OS<br/>Atlascore v3.0 &middot; 07/09/2026
+          BUNKER GYM OS<br/>Atlascore v3.0 &middot; 07/09/2026
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto p-6 relative bg-gray-100 dark:bg-[#050505]">
         <header className="flex items-center justify-between mb-8 max-w-full gap-4">
-          <div className="min-w-0"><h2 className="text-xl font-black text-black dark:text-white tracking-tighter uppercase truncate">{activeTab}</h2><p className="text-[7px] text-gray-500 dark:text-white/20 uppercase font-black tracking-[0.3em]">Fusion Fitness GYM</p></div>
+          <div className="min-w-0"><h2 className="text-xl font-black text-black dark:text-white tracking-tighter uppercase truncate">{activeTab}</h2><p className="text-[7px] text-gray-500 dark:text-white/20 uppercase font-black tracking-[0.3em]">BUNKER GYM</p></div>
 
           {/* License expired banner — header */}
           <div className="flex items-center gap-2">

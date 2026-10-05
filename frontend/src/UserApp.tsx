@@ -227,7 +227,7 @@ const fetchUserBookings = async (memberDni: string) => {
 
     doc.setFontSize(22);
     doc.setTextColor(249, 115, 22);
-    doc.text('FUSION FITNESS GYM', 105, 20, { align: 'center' });
+    doc.text('BUNKER GYM', 105, 20, { align: 'center' });
     
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
@@ -277,7 +277,7 @@ const fetchUserBookings = async (memberDni: string) => {
     doc.setFontSize(10);
     doc.setTextColor(150);
     doc.text('---------------------------------------------------------', 105, finalY + 20, { align: 'center' });
-    doc.text('Sello Institucional - Fusion Fitness', 105, finalY + 26, { align: 'center' });
+    doc.text('Sello Institucional - Bunker Gym', 105, finalY + 26, { align: 'center' });
 
     try {
       const logo = await loadImage('/bunker.png');

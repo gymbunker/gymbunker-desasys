@@ -47,7 +47,7 @@ ctk.set_window_scaling(1.0)
 class SplashScreen(ctk.CTkToplevel):
     def __init__(self):
         super().__init__()
-        self.title("Fusion Fitness")
+        self.title("Bunker Gym")
         self.geometry("400x520")
         self.overrideredirect(True)
         self.attributes("-topmost", True)
@@ -70,7 +70,7 @@ class SplashScreen(ctk.CTkToplevel):
             ctk.CTkLabel(self, image=logo_img, text="").pack(pady=(50, 8))
 
         # UI Elements
-        self.label = ctk.CTkLabel(self, text="FUSION FITNESS", font=ctk.CTkFont(size=30, weight="bold", family="Helvetica"), text_color="#f97316")
+        self.label = ctk.CTkLabel(self, text="BUNKER GYM", font=ctk.CTkFont(size=30, weight="bold", family="Helvetica"), text_color="#f97316")
         self.label.pack(pady=(0, 4))
         ctk.CTkLabel(self, text="Sistema de Control de Acceso", font=ctk.CTkFont(size=11), text_color="#444").pack(pady=(0, 10))
         
@@ -89,7 +89,7 @@ class SplashScreen(ctk.CTkToplevel):
 class GymDesktopKiosk:
     def __init__(self, root):
         self.root = root
-        self.root.title("Fusion Fitness | Control de Acceso")
+        self.root.title("Bunker Gym | Control de Acceso")
         self.root.geometry("1280x800")
         self.root.configure(fg_color="#000000")
         self.root.withdraw()
@@ -162,7 +162,7 @@ class GymDesktopKiosk:
             logo_img = ctk.CTkImage(light_image=Image.open(logo_path),
                                     dark_image=Image.open(logo_path), size=(80, 80))
             ctk.CTkLabel(self.sidebar, image=logo_img, text="").pack(pady=(40, 8))
-        ctk.CTkLabel(self.sidebar, text="FUSION FITNESS", font=ctk.CTkFont(size=28, weight="bold"), text_color="#f97316").pack(pady=(0, 4))
+        ctk.CTkLabel(self.sidebar, text="BUNKER GYM", font=ctk.CTkFont(size=28, weight="bold"), text_color="#f97316").pack(pady=(0, 4))
         ctk.CTkLabel(self.sidebar, text="CONTROL DE ACCESO", font=ctk.CTkFont(size=12, weight="bold"), text_color="#333").pack(pady=(0, 30))
 
         # INPUT CONTAINER (To easily hide/show)
@@ -229,7 +229,7 @@ class GymDesktopKiosk:
         self.plan_label.pack(pady=(0, 16))
 
         # Versioning
-        ctk.CTkLabel(self.sidebar, text="Fusion Fitness v3.0 | SYNC: ONLINE", font=ctk.CTkFont(size=9), text_color="#1a1a1a").pack(side="bottom", pady=20)
+        ctk.CTkLabel(self.sidebar, text="Bunker Gym v3.0 | SYNC: ONLINE", font=ctk.CTkFont(size=9), text_color="#1a1a1a").pack(side="bottom", pady=20)
 
     def handle_backspace(self):
         curr = self.dni_entry.get()
