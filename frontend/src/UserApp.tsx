@@ -218,7 +218,7 @@ const fetchUserBookings = async (memberDni: string) => {
     });
 
     try {
-      const bgImg = await loadImage('/favicon.png');
+      const bgImg = await loadImage('/bunker.png');
       const gState = new (doc as any).GState({opacity: 0.08});
       doc.setGState(gState);
       doc.addImage(bgImg, 'PNG', 45, 80, 120, 120);
@@ -280,7 +280,7 @@ const fetchUserBookings = async (memberDni: string) => {
     doc.text('Sello Institucional - Fusion Fitness', 105, finalY + 26, { align: 'center' });
 
     try {
-      const logo = await loadImage('/logo_B.png');
+      const logo = await loadImage('/bunker.png');
       doc.addImage(logo, 'PNG', 85, finalY + 35, 40, 40);
     } catch (e) {}
 
@@ -598,7 +598,7 @@ const fetchUserBookings = async (memberDni: string) => {
       <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center p-4 font-sans overflow-hidden select-none">
         <div className="w-full max-w-sm bg-black/30 border border-white/10 p-5 sm:p-10 rounded-3xl backdrop-blur-2xl shadow-2xl space-y-4 sm:space-y-8">
           <div className="text-center">
-            <img src="/logo_B.png" alt="Fusion Fitness Logo" className="h-20 sm:h-32 w-auto mx-auto object-contain mb-3 sm:mb-6 filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)]" />
+            <img src="/bunker.png" alt="Bunker Gym Logo" className="h-20 sm:h-32 w-auto mx-auto object-contain mb-3 sm:mb-6 filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)]" />
             <p className="text-white/20 text-[9px] sm:text-xs font-black uppercase tracking-[0.4em]">Personal Fitness OS</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-3 sm:space-y-5">

@@ -1271,8 +1271,8 @@ export default function AdminDashboard() {
     try {
       // Load Images
       const [watermarkImg, logoImg] = await Promise.all([
-        loadImage("/favicon.png"),
-        loadImage("/logo_B.png")
+        loadImage("/bunker.png"),
+        loadImage("/bunker.png")
       ]);
 
       // Background Watermark (Favicon)
@@ -1751,7 +1751,7 @@ export default function AdminDashboard() {
     });
 
     try {
-      const bgImg = await loadImage('/favicon.png');
+      const bgImg = await loadImage('/bunker.png');
       const gState = new (doc as any).GState({opacity: 0.08});
       doc.setGState(gState);
       // Dibujar marca de agua centrada
@@ -1821,7 +1821,7 @@ export default function AdminDashboard() {
     doc.text('Sello Institucional - Fusion Fitness', 105, finalY + 26, { align: 'center' });
 
     try {
-      const logo = await loadImage('/logo_B.png');
+      const logo = await loadImage('/bunker.png');
       doc.addImage(logo, 'PNG', 85, finalY + 35, 40, 40);
     } catch (e) {
       console.warn('No se pudo cargar el logo final', e);
@@ -1903,7 +1903,7 @@ export default function AdminDashboard() {
         <div className="absolute top-4 right-4"><button onClick={() => setIsDarkMode(!isDarkMode)} className="p-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-full text-black dark:text-white shadow-lg transition-all">{isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
         <div className="w-full max-w-[380px] bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-10 rounded-[40px] backdrop-blur-3xl shadow-2xl animate-in zoom-in duration-500">
           <div className="flex justify-center mb-6">
-            <img src={isDarkMode ? "/logo_B.png" : "/logo.png"} alt="Fusion Fitness Logo" className="h-24 w-auto object-contain drop-shadow-xl" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+            <img src="/bunker.png" alt="Bunker Gym Logo" className="h-24 w-auto object-contain drop-shadow-xl" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
             <div className="hidden p-4 bg-orange-500 rounded-2xl shadow-xl shadow-orange-500/30"><ShieldCheck size={32} className="text-black dark:text-white" /></div>
           </div>
           <h2 className="text-2xl font-black text-center mb-8 tracking-tighter uppercase font-sans"><span className="text-black dark:text-white">Fusion</span> <span className="text-orange-500">Fitness</span></h2>
@@ -2167,7 +2167,7 @@ export default function AdminDashboard() {
       <aside className="w-40 h-full border-r border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-black/40 backdrop-blur-3xl flex flex-col p-4 shrink-0">
         <div className="flex flex-col gap-4 mb-8">
           <div className="flex items-center gap-2">
-            <img src={isDarkMode ? "/logo_B.png" : "/logo.png"} alt="Fusion Fitness Logo" className="w-8 h-8 object-contain drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+            <img src="/bunker.png" alt="Bunker Gym Logo" className="w-8 h-8 object-contain drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
             <div className="hidden w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg"><Brain size={16} className="text-black dark:text-white" /></div>
             <h1 className="text-[11px] font-black tracking-tighter uppercase leading-tight"><span className="text-black dark:text-white">Fusion</span> <br/><span className="text-orange-500">Fitness</span></h1>
           </div>

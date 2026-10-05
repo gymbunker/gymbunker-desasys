@@ -26,7 +26,7 @@ export default function SystemNoticeModal({ announcement, isOpen, onClose }: { a
           <div className="flex items-center gap-3">
             {/* Gym Icon */}
             <div className="w-12 h-12 bg-[#141b29] dark:bg-black/40 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden">
-              <img src="/favicon.png" alt="Gym" className="w-8 h-8 object-contain dark:invert" />
+              <img src="/bunker.png" alt="Bunker Gym" className="w-8 h-8 object-contain" />
             </div>
             
             <div className="text-gray-300 animate-pulse">

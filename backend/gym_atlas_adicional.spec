@@ -122,7 +122,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="fusion_fitness.ico" if Path("fusion_fitness.ico").exists() else None,
+    icon="bunker.ico" if Path("bunker.ico").exists() else None,
 )
 
 coll = COLLECT(

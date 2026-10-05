@@ -1,7 +1,7 @@
 @echo off
 echo Construyendo ejecutable de Fusion Fitness Principal...
 cd backend
-pyinstaller --noconfirm --onedir --windowed --name "FusionFitnessPrincipal" --add-data "logo_B.png;." --add-data "..\yolov8n.pt;." --add-data ".env;." desktop_kiosk.py
+pyinstaller --noconfirm --onedir --windowed --name "FusionFitnessPrincipal" --add-data "bunker.png;." --add-data "..\yolov8n.pt;." --add-data ".env;." desktop_kiosk.py
 cd ..
 echo ============================================================
 echo Construccion terminada. El programa esta en:

@@ -22,8 +22,8 @@ if Path("yolov8n.pt").exists():
     added_datas.append(("yolov8n.pt", "."))
 
 # Logo del gym
-if Path("logo_B.png").exists():
-    added_datas.append(("logo_B.png", "."))
+if Path("bunker.png").exists():
+    added_datas.append(("bunker.png", "."))
 
 # .env config template for database connection
 if Path(".env").exists():
@@ -131,7 +131,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="fusion_fitness.ico" if Path("fusion_fitness.ico").exists() else None,
+    icon="bunker.ico" if Path("bunker.ico").exists() else None,
 )
 
 coll = COLLECT(

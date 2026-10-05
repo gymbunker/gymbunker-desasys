@@ -394,7 +394,7 @@ export default function TotemPlan() {
               transition={{ delay: 0.1 }}
               className="mb-8 flex flex-col items-center gap-4"
             >
-              <img src={isDark ? '/logo_B.png' : '/logo.png'} alt="Fusion Fitness Logo" className={`${isDark ? "w-44 h-44" : "w-[14.5rem] h-[14.5rem] -my-6"} object-contain filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)] drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]`} />
+              <img src="/bunker.png" alt="Bunker Gym Logo" className="w-44 h-44 object-contain filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)] drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" />
               <div className="text-center">
                 <h1 className="text-3xl font-black tracking-tight" style={{color:'#F38E26'}}>FUSION FITNESS</h1>
                 <p className={`text-sm font-semibold tracking-[0.2em] uppercase mt-1 ${muted}`}>Totem de Entrenamiento</p>
@@ -434,7 +434,7 @@ export default function TotemPlan() {
             <header className={`sticky top-0 z-40 border-b px-6 py-4 flex items-center justify-between backdrop-blur-sm
               ${isDark ? 'bg-[#141b29]/95 border-white/10' : 'bg-white/90 border-gray-200'}`}>
               <div className="flex items-center gap-4">
-                <img src={isDark ? '/logo_B.png' : '/logo.png'} alt="Logo" className="w-9 h-9 object-contain" />
+                <img src="/bunker.png" alt="Bunker Gym Logo" className="w-9 h-9 object-contain" />
                 <div>
                   <p className={`text-xs font-semibold uppercase tracking-wider ${muted}`}>Bienvenido/a</p>
                   <h2 className="text-lg font-black leading-tight">{member.name}</h2>
