@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from .database import get_db
-from . import models
-from . import schemas
+from database import get_db
+import models
+import schemas
 from typing import List
 import datetime
 from sqlalchemy import func
