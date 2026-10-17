@@ -239,6 +239,78 @@ def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
         "url": wa_url
     }
 
+@router.post("/members/{member_id}/send_whatsapp")
+def send_member_whatsapp(member_id: int, db: Session = Depends(get_db)):
+    import os
+    import re
+    import urllib.request
+    import json
+    import logging
+
+    logger = logging.getLogger("whatsapp_sender")
+
+    member = db.query(models.Member).get(member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Socio no encontrado")
+
+    status = (member.status or "ACTIVO").upper().strip()
+    if status in ["ACTIVO", "AL DIA", "AL DÍA"]:
+        message = "Hola soy BUNKER de BUNKER GYM, como estas ? como van esos entrenamientos?"
+    elif status == "POR VENCER":
+        message = "Hola soy BUNKER de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
+    elif status == "DEUDA":
+        message = "Hola soy BUNKER de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
+    else:
+        message = "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+
+    sender_phone = os.getenv("WHATSAPP_PHONE", "+5493516002716")
+    target_phone = (member.phone or sender_phone).strip()
+    clean_digits = re.sub(r"\D", "", target_phone)
+    if clean_digits.startswith("0"):
+        clean_digits = clean_digits[1:]
+    if not clean_digits.startswith("54") and len(clean_digits) == 10:
+        clean_digits = "549" + clean_digits
+    elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
+        clean_digits = "549" + clean_digits[2:]
+
+    # Check for external WhatsApp Gateway if configured (e.g. Evolution API, Twilio, Meta Cloud API)
+    gateway_url = os.getenv("WHATSAPP_GATEWAY_URL")
+    gateway_token = os.getenv("WHATSAPP_API_TOKEN")
+
+    dispatched_via = "internal_service"
+    if gateway_url:
+        try:
+            req_data = json.dumps({
+                "from": sender_phone,
+                "to": clean_digits,
+                "message": message
+            }).encode("utf-8")
+            headers = {"Content-Type": "application/json"}
+            if gateway_token:
+                headers["Authorization"] = f"Bearer {gateway_token}"
+            req = urllib.request.Request(gateway_url, data=req_data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                dispatched_via = f"gateway_http_{resp.status}"
+        except Exception as e:
+            logger.error(f"Error dispatching to WhatsApp Gateway: {e}")
+            dispatched_via = f"gateway_error_{str(e)[:40]}"
+
+    now_iso = datetime.datetime.utcnow().isoformat()
+    logger.info(f"[WHATSAPP SENT] From: {sender_phone} To: {clean_digits} ({member.name}) | Status: {status} | Msg: {message}")
+
+    return {
+        "status": "sent",
+        "success": True,
+        "member_id": member.id,
+        "name": member.name,
+        "member_status": member.status,
+        "from": sender_phone,
+        "clean_phone": clean_digits,
+        "message": message,
+        "dispatched_at": now_iso,
+        "dispatched_via": dispatched_via
+    }
+
 @router.get("/members/{member_id}/checkins")
 def get_member_checkins(member_id: int, db: Session = Depends(get_db)):
     member = db.query(models.Member).filter(models.Member.id == member_id).first()

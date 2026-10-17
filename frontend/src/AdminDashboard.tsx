@@ -1835,7 +1835,7 @@ export default function AdminDashboard() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'Socios': return <MembersModule members={members} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onHistory={(m:any)=>{ setSelectedItem(m); setMemberCheckins([]); setCheckinStats(null); setModalType('history'); setIsModalOpen(true); fetch(`${API_URL}/admin/members/${m.id}/checkins`).then(r=>r.json()).then(data=>{ const checkinsList = Array.isArray(data) ? data : (data.checkins || []); setMemberCheckins(checkinsList); setCheckinStats({ total: data.total_sessions || 0, used: data.sessions_used || 0, remaining: data.sessions_remaining || 0, plans_breakdown: data.plans_breakdown || null }); }).catch(()=>{}); }} onEdit={(m: any) => { const validPlan = plans.find((p:any) => p.name === m.membership_type)?.name || plans[0]?.name || ''; setSelectedItem({...m, membership_type: validPlan}); setIsEditMode(true); setModalType('member'); setIsModalOpen(true); }} onDelete={(id: any) => { showConfirm("¿Dar de baja socio?", "¿Estás seguro de que deseas dar de baja este socio?", async () => { const res = await fetch(`${API_URL}/admin/members/${id}`, {method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={() => { setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: plans[0]?.name || ''}); setIsEditMode(false); setModalType('member'); setIsModalOpen(true); }} onPayClick={(m: any) => { setSelectedItem(m); setIsPaymentModalOpen(true); }} />;
+      case 'Socios': return <MembersModule API_URL={API_URL} members={members} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onHistory={(m:any)=>{ setSelectedItem(m); setMemberCheckins([]); setCheckinStats(null); setModalType('history'); setIsModalOpen(true); fetch(`${API_URL}/admin/members/${m.id}/checkins`).then(r=>r.json()).then(data=>{ const checkinsList = Array.isArray(data) ? data : (data.checkins || []); setMemberCheckins(checkinsList); setCheckinStats({ total: data.total_sessions || 0, used: data.sessions_used || 0, remaining: data.sessions_remaining || 0, plans_breakdown: data.plans_breakdown || null }); }).catch(()=>{}); }} onEdit={(m: any) => { const validPlan = plans.find((p:any) => p.name === m.membership_type)?.name || plans[0]?.name || ''; setSelectedItem({...m, membership_type: validPlan}); setIsEditMode(true); setModalType('member'); setIsModalOpen(true); }} onDelete={(id: any) => { showConfirm("¿Dar de baja socio?", "¿Estás seguro de que deseas dar de baja este socio?", async () => { const res = await fetch(`${API_URL}/admin/members/${id}`, {method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={() => { setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: plans[0]?.name || ''}); setIsEditMode(false); setModalType('member'); setIsModalOpen(true); }} onPayClick={(m: any) => { setSelectedItem(m); setIsPaymentModalOpen(true); }} />;
       case 'Planes': return <PlansModule plans={plans} onEdit={(p:any)=>{setSelectedItem({...p, allow_unification: !!p.allow_unification, classesInput: (p.classes || []).join(', ')}); setIsEditMode(true); setModalType('plan'); setIsModalOpen(true);}} onDelete={(p:any)=>{ showConfirm("¿Eliminar Plan?", `¿Estás seguro de que deseas eliminar el plan "${p.name}" del sistema?`, async () => { const res = await fetch(`${API_URL}/admin/plans/${p.id}`,{method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={()=>{setSelectedItem({name:'', price:0, daysPerWeek:3, classes:[], classesInput: '', allow_unification: false}); setIsEditMode(false); setModalType('plan'); setIsModalOpen(true);}} />;
       case 'Entrenamientos': return <EntrenamientosModule API_URL={API_URL} />;
       case 'Agenda': return <AgendaModule members={members} API_URL={API_URL} setConfirmModal={setConfirmModal} />;
@@ -2471,45 +2471,38 @@ function WhatsAppIcon({ size = 14, className = "" }: { size?: number; className?
   );
 }
 
-function getWhatsAppMessageForMember(status?: string): string {
-  const s = (status || '').toUpperCase().trim();
-  if (s === 'ACTIVO' || s === 'AL DIA' || s === 'AL DÍA') {
-    return "Hola soy BUNKER de BUNKER GYM, como estas ? como van esos entrenamientos?";
-  } else if (s === 'POR VENCER') {
-    return "Hola soy BUNKER de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde";
-  } else if (s === 'DEUDA') {
-    return "Hola soy BUNKER de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion";
-  }
-  return "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM.";
-}
-
-function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHistory, searchQuery, setSearchQuery }: any) {
+function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHistory, searchQuery, setSearchQuery, API_URL }: any) {
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
+  const [sendingWsId, setSendingWsId] = useState<number | null>(null);
+  const [wsToast, setWsToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const statusOptions = ['TODOS', 'ACTIVO', 'POR VENCER', 'DEUDA', 'INACTIVO'];
 
-  const handleSendWhatsApp = (m: any) => {
-    const defaultEnvPhone = (import.meta as any).env?.VITE_WHATSAPP_PHONE || "+5493516002716";
-    let rawPhone = (m.phone || '').trim();
-    if (!rawPhone) {
-      const entered = window.prompt(`El socio "${m.name}" no tiene número de teléfono registrado.\nIngrese el número de WhatsApp (o confirme para usar el número de contacto):`, defaultEnvPhone);
-      if (!entered) return;
-      rawPhone = entered.trim();
-    }
+  const showWsToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setWsToast({ message, type });
+    setTimeout(() => setWsToast(null), 4000);
+  };
 
-    let cleaned = rawPhone.replace(/\D/g, '');
-    if (cleaned.startsWith('0')) {
-      cleaned = cleaned.substring(1);
+  const handleSendWhatsApp = async (m: any) => {
+    setSendingWsId(m.id);
+    try {
+      const targetApi = API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? "http://localhost:8000" : "/api");
+      const res = await fetch(`${targetApi}/admin/members/${m.id}/send_whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showWsToast(`Aviso de WhatsApp enviado a ${m.name} (+${data.clean_phone || 'OK'})`, 'success');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showWsToast(`Error al enviar: ${err.detail || res.status}`, 'error');
+      }
+    } catch (e) {
+      showWsToast(`Error de conexión al enviar WhatsApp`, 'error');
+    } finally {
+      setSendingWsId(null);
     }
-    if (!cleaned.startsWith('54') && cleaned.length === 10) {
-      cleaned = '549' + cleaned;
-    } else if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
-      cleaned = '549' + cleaned.substring(2);
-    }
-
-    const message = getWhatsAppMessageForMember(m.status);
-    const url = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
   };
 
   const filteredMembers = members
@@ -2521,7 +2514,14 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
     .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {wsToast && (
+        <div className={`fixed bottom-6 right-6 z-[200] px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border text-xs font-black flex items-center gap-3 transition-all ${wsToast.type === 'success' ? 'bg-[#0b1d14]/95 border-[#25D366]/40 text-[#25D366]' : 'bg-red-950/95 border-red-500/40 text-red-400'}`}>
+          <WhatsAppIcon size={16} />
+          <span>{wsToast.message}</span>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h3 className="font-black text-lg uppercase">Gestión de Socios</h3>
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
@@ -2543,6 +2543,7 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {filteredMembers.map((m: any) => {
           const { daysIn, daysLeft, totalDays } = memberDaysInfo(m.joined_at, m.status, m.membership_type);
+          const isSending = sendingWsId === m.id;
           return (
             <div key={m.id} className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/5 hover:border-orange-500/10 transition-all group overflow-hidden">
               <div className="flex items-start gap-3 mb-2">
@@ -2556,10 +2557,15 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
                 </div>
                 <button 
                   onClick={() => handleSendWhatsApp(m)}
-                  title={`Enviar WhatsApp (${m.status})`}
-                  className="p-2 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all shadow-sm shrink-0"
+                  disabled={isSending}
+                  title={`Enviar WhatsApp a ${m.name} (${m.status})`}
+                  className="p-2 bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all shadow-sm shrink-0 disabled:opacity-50"
                 >
-                  <WhatsAppIcon size={14} />
+                  {isSending ? (
+                    <div className="w-3.5 h-3.5 border-2 border-[#25D366] border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <WhatsAppIcon size={14} />
+                  )}
                 </button>
               </div>
               <div className="mb-3 px-1">
@@ -2574,13 +2580,6 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
                 <button onClick={() => onPayClick(m)} className="col-span-2 py-2 bg-green-500/10 text-green-500 rounded-lg text-[8px] font-black uppercase hover:bg-green-500 hover:text-black dark:text-white transition-all">Cobrar</button>
                 <button onClick={() => onEdit(m)} className="py-2 bg-white dark:bg-white/5 text-gray-600 dark:text-white/40 rounded-lg text-[8px] font-black uppercase">Editar</button>
                 <button onClick={() => onHistory(m)} className="py-2 bg-white dark:bg-white/5 text-orange-400 rounded-lg text-[8px] font-black uppercase">Historial</button>
-                <button 
-                  onClick={() => handleSendWhatsApp(m)} 
-                  className="col-span-2 py-2 bg-[#25D366]/15 hover:bg-[#25D366] text-[#25D366] hover:text-white rounded-lg text-[8px] font-black uppercase flex items-center justify-center gap-1.5 transition-all shadow-sm border border-[#25D366]/20"
-                >
-                  <WhatsAppIcon size={12} />
-                  <span>Mensaje WhatsApp</span>
-                </button>
                 <button onClick={() => onDelete(m.id)} className="col-span-2 py-2 bg-red-500/10 text-red-500 rounded-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all">Dar de Baja</button>
               </div>
             </div>
