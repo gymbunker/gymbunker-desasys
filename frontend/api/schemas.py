@@ -68,6 +68,10 @@ class UserLogin(BaseModel):
     dni: str
     password: str
 
+class StaffLogin(BaseModel):
+    username: str
+    password: str
+
 class PasswordChange(BaseModel):
     new_password: str
 

@@ -58,26 +58,29 @@ export default function AdminDashboard() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/admin/staff`);
+      const res = await fetch(`${API_URL}/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginUser.trim(),
+          password: loginPass
+        })
+      });
+
       if (res.ok) {
-        const staffData = await res.json();
-        const staffMember = staffData.find((s:any) => 
-          (s.username && s.username.toLowerCase() === loginUser.toLowerCase()) || 
-          (s.name && s.name.toLowerCase() === loginUser.toLowerCase())
-        );
-        
-        if (staffMember && loginPass === (staffMember.password || '1234')) {
-          const role = staffMember.role.toLowerCase() === 'administración' ? 'administracion' : staffMember.role.toLowerCase();
-          localStorage.setItem('gym_session', '1'); localStorage.setItem('gym_role', role); localStorage.setItem('gym_user', JSON.stringify(staffMember));
-          setIsAuthenticated(true);
-          setLoggedUser(staffMember);
-          setUserRole(role as any);
-          if (role === 'entrenador') setActiveTab('Socios');
-          else setActiveTab('Resumen');
-          return;
-        }
+        const staffMember = await res.json();
+        const role = (staffMember.role || '').toLowerCase() === 'administración' ? 'administracion' : (staffMember.role || '').toLowerCase();
+        localStorage.setItem('gym_session', '1'); localStorage.setItem('gym_role', role); localStorage.setItem('gym_user', JSON.stringify(staffMember));
+        setIsAuthenticated(true);
+        setLoggedUser(staffMember);
+        setUserRole(role as any);
+        if (role === 'entrenador') setActiveTab('Socios');
+        else setActiveTab('Resumen');
+        return;
       }
-      setError("Credenciales incorrectas. Verifique usuario y contraseña.");
+      
+      const data = await res.json().catch(() => ({}));
+      setError(data.detail || "Credenciales incorrectas. Verifique usuario y contraseña.");
     } catch (err) {
       setError("Error de conexión al verificar credenciales.");
     }

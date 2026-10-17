@@ -5,6 +5,10 @@ from database import get_db
 import models
 import schemas
 import datetime
+try:
+    from .security import hash_password, verify_password
+except ImportError:
+    from security import hash_password, verify_password
 
 router = APIRouter(prefix="/user", tags=["User"])
 
@@ -58,8 +62,13 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
     if not member:
         raise HTTPException(status_code=404, detail="Socio no encontrado")
     
-    if member.password != credentials.password:
+    if not verify_password(credentials.password, member.password):
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
+    # If unhashed legacy password, upgrade to PBKDF2 hash on successful login
+    if member.password and not member.password.startswith("pbkdf2:"):
+        member.password = hash_password(credentials.password)
+        db.commit()
     
     if member.joined_at and member.status != 'INACTIVO':
         membership_type = (member.membership_type or "").upper()
@@ -103,7 +112,7 @@ def change_password(dni: str, data: schemas.PasswordChange, db: Session = Depend
     if not member:
         raise HTTPException(status_code=404, detail="Socio no encontrado")
     
-    member.password = data.new_password
+    member.password = hash_password(data.new_password)
     db.commit()
     return {"status": "success", "message": "Contraseña actualizada correctamente"}
 

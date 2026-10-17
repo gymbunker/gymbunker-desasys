@@ -6,8 +6,40 @@ import schemas
 from typing import List
 import datetime
 from sqlalchemy import func
+try:
+    from .security import hash_password, verify_password
+except ImportError:
+    from security import hash_password, verify_password
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+@router.post("/login")
+def admin_login(credentials: schemas.StaffLogin, db: Session = Depends(get_db)):
+    username_or_name = credentials.username.strip().lower()
+    staff_member = db.query(models.Staff).filter(
+        func.lower(models.Staff.username) == username_or_name
+    ).first()
+    if not staff_member:
+        staff_member = db.query(models.Staff).filter(
+            func.lower(models.Staff.name) == username_or_name
+        ).first()
+
+    if not staff_member or not verify_password(credentials.password, staff_member.password):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    # If unhashed legacy password in DB, upgrade to PBKDF2 hash automatically
+    if staff_member.password and not staff_member.password.startswith("pbkdf2:"):
+        staff_member.password = hash_password(credentials.password)
+        db.commit()
+        db.refresh(staff_member)
+
+    return {
+        "id": staff_member.id,
+        "name": staff_member.name,
+        "username": staff_member.username,
+        "role": staff_member.role,
+        "shift": staff_member.shift
+    }
 
 @router.get("/stats")
 def get_gym_stats(db: Session = Depends(get_db)):
@@ -102,7 +134,8 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
         data['phone'] = None
     if not data.get('joined_at'):
         data['joined_at'] = datetime.datetime.utcnow()
-    data['status'] = 'ACTIVO'  # new members always start active
+    if data.get('password'):
+        data['password'] = hash_password(data['password'])
     db_member = models.Member(**data)
     db.add(db_member)
     try:
@@ -148,7 +181,11 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         else:
             data['status'] = 'ACTIVO'
     for key, value in data.items():
-        setattr(db_member, key, value)
+        if key == 'password':
+            if value and not value.startswith('pbkdf2:'):
+                setattr(db_member, key, hash_password(value))
+        else:
+            setattr(db_member, key, value)
 
     db.commit()
     db.refresh(db_member)
@@ -333,7 +370,10 @@ def get_all_staff(db: Session = Depends(get_db)):
 
 @router.post("/staff", response_model=schemas.StaffSchema)
 def create_staff(staff: schemas.StaffCreate, db: Session = Depends(get_db)):
-    db_staff = models.Staff(**staff.dict())
+    data = staff.dict()
+    if data.get("password"):
+        data["password"] = hash_password(data["password"])
+    db_staff = models.Staff(**data)
     db.add(db_staff)
     db.commit()
     db.refresh(db_staff)
@@ -346,7 +386,11 @@ def update_staff(staff_id: int, staff_data: schemas.StaffCreate, db: Session = D
         raise HTTPException(status_code=404, detail="Staff not found")
     
     for key, value in staff_data.dict().items():
-        setattr(db_staff, key, value)
+        if key == "password":
+            if value and not value.startswith("pbkdf2:"):
+                setattr(db_staff, key, hash_password(value))
+        else:
+            setattr(db_staff, key, value)
     
     db.commit()
     db.refresh(db_staff)
