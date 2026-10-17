@@ -904,10 +904,61 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function WhatsAppIcon({ size = 14, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="currentColor" 
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.04 3.67C14.24 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.16 12.04 20.16C10.67 20.16 9.32 19.8 8.13 19.11L7.85 18.94L4.73 19.76L5.56 16.72L5.37 16.42C4.62 15.22 4.22 13.58 4.22 11.91C4.22 7.37 7.92 3.67 12.04 3.67ZM8.82 7.15C8.64 7.15 8.44 7.22 8.28 7.39C8.04 7.64 7.42 8.22 7.42 9.42C7.42 10.62 8.3 11.78 8.42 11.94C8.54 12.1 10.15 14.59 12.61 15.65C13.2 15.9 13.65 16.05 14.01 16.17C14.6 16.35 15.13 16.33 15.56 16.27C16.03 16.2 17.02 15.67 17.23 15.08C17.44 14.49 17.44 13.98 17.37 13.88C17.31 13.78 17.15 13.72 16.91 13.6C16.67 13.48 15.48 12.89 15.26 12.81C15.04 12.73 14.88 12.69 14.72 12.93C14.56 13.17 14.09 13.72 13.95 13.88C13.81 14.04 13.67 14.06 13.43 13.94C13.19 13.82 12.42 13.57 11.51 12.76C10.8 12.13 10.32 11.35 10.2 11.14C10.08 10.93 10.19 10.82 10.31 10.7C10.42 10.59 10.56 10.41 10.68 10.27C10.8 10.13 10.84 10.03 10.92 9.87C11 9.71 10.96 9.57 10.9 9.45C10.84 9.33 10.38 8.19 10.18 7.72C9.99 7.27 9.79 7.33 9.64 7.32C9.5 7.31 9.34 7.31 9.18 7.31L8.82 7.15Z" />
+    </svg>
+  );
+}
+
+function getWhatsAppMessageForMember(status?: string): string {
+  const s = (status || '').toUpperCase().trim();
+  if (s === 'ACTIVO' || s === 'AL DIA' || s === 'AL DÍA') {
+    return "Hola soy BUNKER de BUNKER GYM, como estas ? como van esos entrenamientos?";
+  } else if (s === 'POR VENCER') {
+    return "Hola soy BUNKER de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde";
+  } else if (s === 'DEUDA') {
+    return "Hola soy BUNKER de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion";
+  }
+  return "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM.";
+}
+
 function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHistory, searchQuery, setSearchQuery }: any) {
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
 
   const statusOptions = ['TODOS', 'ACTIVO', 'POR VENCER', 'DEUDA', 'INACTIVO'];
+
+  const handleSendWhatsApp = (m: any) => {
+    const defaultEnvPhone = (import.meta as any).env?.VITE_WHATSAPP_PHONE || "+5493516002716";
+    let rawPhone = (m.phone || '').trim();
+    if (!rawPhone) {
+      const entered = window.prompt(`El socio "${m.name}" no tiene número de teléfono registrado.\nIngrese el número de WhatsApp (o confirme para usar el número de contacto):`, defaultEnvPhone);
+      if (!entered) return;
+      rawPhone = entered.trim();
+    }
+
+    let cleaned = rawPhone.replace(/\D/g, '');
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    if (!cleaned.startsWith('54') && cleaned.length === 10) {
+      cleaned = '549' + cleaned;
+    } else if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
+      cleaned = '549' + cleaned.substring(2);
+    }
+
+    const message = getWhatsAppMessageForMember(m.status);
+    const url = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
 
   const filteredMembers = members.filter((m: any) => {
     const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.dni.includes(searchQuery);
@@ -949,6 +1000,13 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
                     <StatusBadge status={m.status} />
                   </div>
                 </div>
+                <button 
+                  onClick={() => handleSendWhatsApp(m)}
+                  title={`Enviar WhatsApp (${m.status})`}
+                  className="p-2 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all shadow-sm shrink-0"
+                >
+                  <WhatsAppIcon size={14} />
+                </button>
               </div>
               <div className="mb-3 px-1">
                 <p className="text-[7px] text-gray-400 dark:text-white/20 font-black uppercase">
@@ -962,6 +1020,13 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
                 <button onClick={() => onPayClick(m)} className="col-span-2 py-2 bg-green-500/10 text-green-500 rounded-lg text-[8px] font-black uppercase hover:bg-green-500 hover:text-black dark:text-white transition-all">Cobrar</button>
                 <button onClick={() => onEdit(m)} className="py-2 bg-white dark:bg-white/5 text-gray-600 dark:text-white/40 rounded-lg text-[8px] font-black uppercase">Editar</button>
                 <button onClick={() => onHistory(m)} className="py-2 bg-white dark:bg-white/5 text-orange-400 rounded-lg text-[8px] font-black uppercase">Historial</button>
+                <button 
+                  onClick={() => handleSendWhatsApp(m)} 
+                  className="col-span-2 py-2 bg-[#25D366]/15 hover:bg-[#25D366] text-[#25D366] hover:text-white rounded-lg text-[8px] font-black uppercase flex items-center justify-center gap-1.5 transition-all shadow-sm border border-[#25D366]/20"
+                >
+                  <WhatsAppIcon size={12} />
+                  <span>Mensaje WhatsApp</span>
+                </button>
                 <button onClick={() => onDelete(m.id)} className="col-span-2 py-2 bg-red-500/10 text-red-500 rounded-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all">Dar de Baja</button>
               </div>
             </div>

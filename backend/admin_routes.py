@@ -191,7 +191,49 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
     db.refresh(db_member)
     return db_member
 
-@router.get("/members/{member_id}/checkins")
+@router.get("/members/{member_id}/whatsapp")
+def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
+    import os
+    import re
+    import urllib.parse
+
+    member = db.query(models.Member).get(member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Socio no encontrado")
+
+    status = (member.status or "ACTIVO").upper().strip()
+    if status in ["ACTIVO", "AL DIA", "AL DÍA"]:
+        message = "Hola soy BUNKER de BUNKER GYM, como estas ? como van esos entrenamientos?"
+    elif status == "POR VENCER":
+        message = "Hola soy BUNKER de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
+    elif status == "DEUDA":
+        message = "Hola soy BUNKER de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
+    else:
+        message = "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+
+    default_phone = os.getenv("WHATSAPP_PHONE", "+5493516002716")
+    target_phone = (member.phone or default_phone).strip()
+    clean_digits = re.sub(r"\D", "", target_phone)
+    if clean_digits.startswith("0"):
+        clean_digits = clean_digits[1:]
+    if not clean_digits.startswith("54") and len(clean_digits) == 10:
+        clean_digits = "549" + clean_digits
+    elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
+        clean_digits = "549" + clean_digits[2:]
+
+    encoded_text = urllib.parse.quote(message)
+    wa_url = f"https://api.whatsapp.com/send?phone={clean_digits}&text={encoded_text}"
+
+    return {
+        "member_id": member.id,
+        "name": member.name,
+        "status": member.status,
+        "phone": target_phone,
+        "clean_phone": clean_digits,
+        "message": message,
+        "url": wa_url
+    }
+
 @router.get("/members/{member_id}/checkins")
 def get_member_checkins(member_id: int, db: Session = Depends(get_db)):
     member = db.query(models.Member).filter(models.Member.id == member_id).first()
