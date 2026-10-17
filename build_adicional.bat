@@ -1,11 +1,11 @@
 @echo off
-echo Construyendo ejecutable de Fusion Fitness Adicional...
+echo Construyendo ejecutable de Bunker Gym Adicional...
 cd backend
-pyinstaller --noconfirm --onedir --windowed --name "FusionFitnessAdicional" --add-data "bunker.png;." --add-data "..\yolov8n.pt;." --add-data ".env;." desktop_kiosk_adicional.py
+pyinstaller --noconfirm --onedir --windowed --name "BunkerGymAdicional" --add-data "bunker.png;." --add-data "..\yolov8n.pt;." --add-data ".env;." desktop_kiosk_adicional.py
 cd ..
 echo ============================================================
 echo Construccion terminada. El programa esta en:
-echo backend\dist\FusionFitnessAdicional
+echo backend\dist\BunkerGymAdicional
 echo ============================================================
 echo.
 echo Ahora puedes hacer doble clic en el archivo Installer_Adicional.iss

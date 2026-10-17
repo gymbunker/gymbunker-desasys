@@ -15,8 +15,10 @@ if not DATABASE_URL:
 
 from sqlalchemy import create_engine, text
 from models import Base
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-print(f"Connecting to {DATABASE_URL}")
+print("Connecting to Neon database (credentials masked)...")
 engine = create_engine(DATABASE_URL)
 
 with engine.connect() as conn:

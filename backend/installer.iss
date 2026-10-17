@@ -3,23 +3,23 @@
 ; Compilar: abrir este archivo en Inno Setup y presionar F9
 ; Resultado: Output\GymAtlas_Setup.exe
 
-#define MyAppName "Fusion Fitness"
-#define MyAppVersion "2.6"
-#define MyAppPublisher "Fusion Fitness Cruz del Eje"
-#define MyAppExeName "FusionFitness.exe"
-#define MyAppDir "dist\FusionFitness"
+#define MyAppName "Bunker Gym"
+#define MyAppVersion "3.0"
+#define MyAppPublisher "Bunker Gym"
+#define MyAppExeName "BunkerGym.exe"
+#define MyAppDir "dist\BunkerGym"
 
 [Setup]
 AppId={{B4F2A3D1-7C8E-4F1A-9B2D-3E5F6A7C8D9E}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL=https://fusionfitnesscruzdeleje.vercel.app
-DefaultDirName={autopf}\GymAtlas
+AppPublisherURL=https://gymbunker.vercel.app
+DefaultDirName={autopf}\BunkerGym
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=FusionFitness_Setup
+OutputBaseFilename=BunkerGym_Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -45,7 +45,7 @@ Name: "desktopicon"; \
     Flags: checkedonce
 
 Name: "autostart"; \
-    Description: "Iniciar Fusion Fitness automáticamente con Windows"; \
+    Description: "Iniciar {#MyAppName} automáticamente con Windows"; \
     GroupDescription: "Opciones de inicio:"; \
     Flags: unchecked
 
@@ -108,6 +108,6 @@ begin
   begin
     EnvFile := ExpandConstant('{app}\.env');
     if not FileExists(EnvFile) then
-      SaveStringToFile(EnvFile, 'DATABASE_URL=postgresql://neondb_owner:npg_x2MYst8Ibckd@ep-dry-term-b5hg2ejm-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require' + #13#10, False);
+      SaveStringToFile(EnvFile, '# Configuracion de Base de Datos Neon' + #13#10 + 'DATABASE_URL=postgresql://usuario:clave@host/db?sslmode=require' + #13#10, False);
   end;
 end;

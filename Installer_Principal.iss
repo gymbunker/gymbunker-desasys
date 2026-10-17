@@ -1,21 +1,21 @@
 [Setup]
-AppName=Fusion Fitness Principal
+AppName=Bunker Gym Principal
 AppVersion=3.0
-DefaultDirName={pf}\FusionFitnessPrincipal
-DefaultGroupName=Fusion Fitness Principal
-UninstallDisplayIcon={app}\FusionFitnessPrincipal.exe
+DefaultDirName={pf}\BunkerGymPrincipal
+DefaultGroupName=Bunker Gym Principal
+UninstallDisplayIcon={app}\BunkerGymPrincipal.exe
 Compression=lzma2
 SolidCompression=yes
 OutputDir=.\Output
-OutputBaseFilename=Instalador_FusionFitness_Principal
+OutputBaseFilename=Instalador_BunkerGym_Principal
 PrivilegesRequired=admin
 
 [Files]
-Source: "backend\dist\FusionFitnessPrincipal\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "backend\dist\BunkerGymPrincipal\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Fusion Fitness Principal"; Filename: "{app}\FusionFitnessPrincipal.exe"
-Name: "{commondesktop}\Fusion Fitness Principal"; Filename: "{app}\FusionFitnessPrincipal.exe"
+Name: "{group}\Bunker Gym Principal"; Filename: "{app}\BunkerGymPrincipal.exe"
+Name: "{commondesktop}\Bunker Gym Principal"; Filename: "{app}\BunkerGymPrincipal.exe"
 
 [Run]
-Filename: "{app}\FusionFitnessPrincipal.exe"; Description: "Lanzar Fusion Fitness Principal"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\BunkerGymPrincipal.exe"; Description: "Lanzar Bunker Gym Principal"; Flags: nowait postinstall skipifsilent

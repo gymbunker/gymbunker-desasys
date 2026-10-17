@@ -1,15 +1,15 @@
 @echo off
 chcp 65001 >nul
 echo.
-echo  Actualizando Fusion Fitness...
+echo  Actualizando Bunker Gym...
 echo.
 
-set DEST=C:\Program Files\GymAtlas
+set DEST=C:\Program Files\BunkerGym
 
-taskkill /F /IM FusionFitness.exe >nul 2>&1
+taskkill /F /IM BunkerGym.exe >nul 2>&1
 echo  [OK] App cerrada (si estaba abierta)
 
-xcopy /E /Y /I "dist\FusionFitness\*" "%DEST%\" >nul
+xcopy /E /Y /I "dist\BunkerGym\*" "%DEST%\" >nul
 echo  [OK] Archivos actualizados en %DEST%
 
 echo.

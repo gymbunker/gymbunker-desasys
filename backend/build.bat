@@ -76,16 +76,16 @@ echo  ╔═══════════════════════�
 echo  ║           BUILD EXITOSO                 ║
 echo  ╚══════════════════════════════════════════╝
 echo.
-echo  Aplicacion Principal en:  dist\FusionFitness\FusionFitness.exe
-echo  Aplicacion Adicional en:  dist\FusionFitnessAdicional\FusionFitnessAdicional.exe
+echo  Aplicacion Principal en:  dist\BunkerGym\BunkerGym.exe
+echo  Aplicacion Adicional en:  dist\BunkerGymAdicional\BunkerGymAdicional.exe
 echo.
 echo  PROXIMOS PASOS:
 echo  ─────────────────────────────────────────
-echo  1. Edita dist\FusionFitness\.env con tu DATABASE_URL
-echo  2. Prueba ejecutando dist\FusionFitness\FusionFitness.exe
+echo  1. Edita dist\BunkerGym\.env con tu DATABASE_URL
+echo  2. Prueba ejecutando dist\BunkerGym\BunkerGym.exe
 echo  3. Para crear el INSTALADOR (.exe de setup):
 echo     - Instala Inno Setup desde https://jrsoftware.org/isinfo.php
 echo     - Abre installer.iss y presiona Compile (F9)
-echo     - El instalador quedara en: Output\FusionFitness_Setup.exe
+echo     - El instalador quedara en: Output\BunkerGym_Setup.exe
 echo.
 pause

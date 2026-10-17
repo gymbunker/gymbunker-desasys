@@ -1,21 +1,21 @@
 [Setup]
-AppName=Fusion Fitness Adicional
+AppName=Bunker Gym Adicional
 AppVersion=3.0
-DefaultDirName={pf}\FusionFitnessAdicional
-DefaultGroupName=Fusion Fitness Adicional
-UninstallDisplayIcon={app}\FusionFitnessAdicional.exe
+DefaultDirName={pf}\BunkerGymAdicional
+DefaultGroupName=Bunker Gym Adicional
+UninstallDisplayIcon={app}\BunkerGymAdicional.exe
 Compression=lzma2
 SolidCompression=yes
 OutputDir=.\Output
-OutputBaseFilename=Instalador_FusionFitness_Adicional
+OutputBaseFilename=Instalador_BunkerGym_Adicional
 PrivilegesRequired=admin
 
 [Files]
-Source: "backend\dist\FusionFitnessAdicional\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "backend\dist\BunkerGymAdicional\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Fusion Fitness Adicional"; Filename: "{app}\FusionFitnessAdicional.exe"
-Name: "{commondesktop}\Fusion Fitness Adicional"; Filename: "{app}\FusionFitnessAdicional.exe"
+Name: "{group}\Bunker Gym Adicional"; Filename: "{app}\BunkerGymAdicional.exe"
+Name: "{commondesktop}\Bunker Gym Adicional"; Filename: "{app}\BunkerGymAdicional.exe"
 
 [Run]
-Filename: "{app}\FusionFitnessAdicional.exe"; Description: "Lanzar Fusion Fitness Adicional"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\BunkerGymAdicional.exe"; Description: "Lanzar Bunker Gym Adicional"; Flags: nowait postinstall skipifsilent

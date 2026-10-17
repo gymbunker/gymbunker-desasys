@@ -51,6 +51,7 @@ class Booking(Base):
     class_schedule_id = Column(Integer, ForeignKey("class_schedules.id"), nullable=True)
     class_name = Column(String)
     start_time = Column(DateTime)
+    attended_at = Column(DateTime, nullable=True)
     status = Column(String, default="reserved") # reserved, attended, cancelled
     exercises_done = Column(JSON, nullable=True)
 
@@ -62,7 +63,8 @@ class ClassSchedule(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
     code = Column(String)
-    day_of_week = Column(Integer)  # 0=Lunes, 1=Martes...
+    day_of_week = Column(Integer, nullable=True)  # 0=Lunes, 1=Martes...
+    specific_date = Column(String, nullable=True) # "YYYY-MM-DD" para clases de un solo dia
     start_time = Column(String)  # "08:30"
     end_time = Column(String)  # "09:30"
     color = Column(String, default="#3b82f6")

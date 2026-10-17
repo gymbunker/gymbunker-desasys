@@ -3,23 +3,23 @@
 ; Compilar: abrir este archivo en Inno Setup y presionar F9
 ; Resultado: Output\GymAtlas_Setup.exe
 
-#define MyAppName "Fusion Fitness Adicional Kiosk"
-#define MyAppVersion "2.6"
-#define MyAppPublisher "Fusion Fitness"
-#define MyAppExeName "FusionFitnessAdicional.exe"
-#define MyAppDir "dist\FusionFitnessAdicional"
+#define MyAppName "Bunker Gym Adicional Kiosk"
+#define MyAppVersion "3.0"
+#define MyAppPublisher "Bunker Gym"
+#define MyAppExeName "BunkerGymAdicional.exe"
+#define MyAppDir "dist\BunkerGymAdicional"
 
 [Setup]
 AppId={{B4F2A3D1-7C8E-4F1A-9B2D-3E5F6A7C8D9E}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL=https://fusionfitnesscruzdeleje.vercel.app
-DefaultDirName={autopf}\FusionFitness
+AppPublisherURL=https://gymbunker.vercel.app
+DefaultDirName={autopf}\BunkerGymAdicional
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=FusionFitnessAdicional_Setup
+OutputBaseFilename=BunkerGymAdicional_Setup
 SetupIconFile=bunker.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
