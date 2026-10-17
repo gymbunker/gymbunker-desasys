@@ -284,30 +284,80 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
     elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
         clean_digits = "549" + clean_digits[2:]
 
-    # Check for external WhatsApp Gateway if configured (e.g. Evolution API, Twilio, Meta Cloud API)
+    # Check for configured WhatsApp Gateways
+    meta_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+    meta_token = os.getenv("WHATSAPP_META_TOKEN") or os.getenv("WHATSAPP_API_TOKEN")
     gateway_url = os.getenv("WHATSAPP_GATEWAY_URL")
     gateway_token = os.getenv("WHATSAPP_API_TOKEN")
 
-    dispatched_via = "internal_service"
-    if gateway_url:
+    dispatched_via = None
+
+    # 1. Meta WhatsApp Cloud API (Oficial Meta)
+    if meta_phone_id and meta_token:
         try:
-            req_data = json.dumps({
-                "from": sender_phone,
+            url = f"https://graph.facebook.com/v19.0/{meta_phone_id}/messages"
+            payload_data = json.dumps({
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
                 "to": clean_digits,
-                "message": message
+                "type": "text",
+                "text": {"preview_url": False, "body": message}
             }).encode("utf-8")
-            headers = {"Content-Type": "application/json"}
-            if gateway_token:
-                headers["Authorization"] = f"Bearer {gateway_token}"
-            req = urllib.request.Request(gateway_url, data=req_data, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                dispatched_via = f"gateway_http_{resp.status}"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {meta_token}"
+            }
+            req = urllib.request.Request(url, data=payload_data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                dispatched_via = f"meta_cloud_api_http_{resp.status}"
+        except urllib.error.HTTPError as e:
+            err_content = e.read().decode("utf-8", errors="ignore")
+            logger.error(f"Meta Cloud API error: {err_content}")
+            raise HTTPException(status_code=502, detail=f"Error en Meta Cloud API ({e.code}): {err_content}")
         except Exception as e:
-            logger.error(f"Error dispatching to WhatsApp Gateway: {e}")
-            dispatched_via = f"gateway_error_{str(e)[:40]}"
+            logger.error(f"Error conectando a Meta Cloud API: {e}")
+            raise HTTPException(status_code=502, detail=f"Fallo al conectar con Meta Cloud API: {str(e)}")
+
+    # 2. Universal QR / REST Gateway (UltraMsg, Evolution API, Whapi, etc.)
+    elif gateway_url:
+        try:
+            if "ultramsg.com" in gateway_url:
+                post_data = urllib.parse.urlencode({
+                    "token": gateway_token or "",
+                    "to": clean_digits,
+                    "body": message
+                }).encode("utf-8")
+                headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            else:
+                post_data = json.dumps({
+                    "sender": sender_phone,
+                    "phone": clean_digits,
+                    "to": clean_digits,
+                    "message": message
+                }).encode("utf-8")
+                headers = {"Content-Type": "application/json"}
+                if gateway_token:
+                    headers["Authorization"] = f"Bearer {gateway_token}"
+
+            req = urllib.request.Request(gateway_url, data=post_data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                dispatched_via = f"gateway_http_{resp.status}"
+        except urllib.error.HTTPError as e:
+            err_content = e.read().decode("utf-8", errors="ignore")
+            logger.error(f"Gateway WhatsApp error: {err_content}")
+            raise HTTPException(status_code=502, detail=f"Error en Gateway WhatsApp ({e.code}): {err_content}")
+        except Exception as e:
+            logger.error(f"Error conectando a Gateway WhatsApp: {e}")
+            raise HTTPException(status_code=502, detail=f"Fallo al enviar mediante Gateway WhatsApp: {str(e)}")
+
+    else:
+        raise HTTPException(
+            status_code=503,
+            detail="Pasarela de WhatsApp no conectada. Para envíos 100% automáticos y silenciosos se requiere configurar en Vercel: WHATSAPP_GATEWAY_URL o (WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_API_TOKEN)."
+        )
 
     now_iso = datetime.datetime.utcnow().isoformat()
-    logger.info(f"[WHATSAPP SENT] From: {sender_phone} To: {clean_digits} ({member.name}) | Status: {status} | Msg: {message}")
+    logger.info(f"[WHATSAPP SENT via {dispatched_via}] To: {clean_digits} ({member.name}) | Status: {status}")
 
     return {
         "status": "sent",
