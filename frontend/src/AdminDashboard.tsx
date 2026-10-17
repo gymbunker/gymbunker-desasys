@@ -1362,26 +1362,20 @@ export default function AdminDashboard() {
       return;
     }
     
-    // Cuenta maestra de respaldo (por si la BD está vacía)
-    if (loginUser === 'master' && (loginPass === ' cruz$3j3.4820A ' || loginPass === 'cruz$3j3.4820A' || loginPass === '$3j3.4820Acruz')) {
-      const u = { name: 'Master', role: 'Gerente', id: 0 };
-      localStorage.setItem('gym_session', '1'); localStorage.setItem('gym_role', 'gerente'); localStorage.setItem('gym_user', JSON.stringify(u));
-      setIsAuthenticated(true); setUserRole('gerente'); setLoggedUser(u); setActiveTab('Resumen');
-      return;
-    }
-
     try {
       const res = await fetch(`${API_URL}/admin/staff`);
       if (res.ok) {
         const staffData = await res.json();
         const staffMember = staffData.find((s:any) => 
-          (s.username && s.username.toLowerCase() === loginUser.toLowerCase()) || 
-          (s.name && s.name.toLowerCase() === loginUser.toLowerCase())
+          (s.username && s.username.toLowerCase() === loginUser.trim().toLowerCase()) || 
+          (s.name && s.name.toLowerCase() === loginUser.trim().toLowerCase())
         );
         
-        if (staffMember && loginPass === (staffMember.password || '1234')) {
+        if (staffMember && loginPass === staffMember.password) {
           const role = staffMember.role.toLowerCase() === 'administración' ? 'administracion' : staffMember.role.toLowerCase();
-          localStorage.setItem('gym_session', '1'); localStorage.setItem('gym_role', role); localStorage.setItem('gym_user', JSON.stringify(staffMember));
+          localStorage.setItem('gym_session', '1'); 
+          localStorage.setItem('gym_role', role); 
+          localStorage.setItem('gym_user', JSON.stringify(staffMember));
           setIsAuthenticated(true);
           setLoggedUser(staffMember);
           setUserRole(role as any);
@@ -1460,7 +1454,7 @@ export default function AdminDashboard() {
       Icon = XCircle;
     }
 
-    const isMaster = loggedUser?.id === 0;
+    const isMaster = loggedUser?.id === 0 || loggedUser?.username?.toLowerCase() === 'master';
 
     const handleRenew = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -1844,7 +1838,7 @@ export default function AdminDashboard() {
       case 'Agenda': return <AgendaModule members={members} API_URL={API_URL} setConfirmModal={setConfirmModal} />;
       case 'Mi Perfil': return <ProfileModule user={loggedUser} onSave={async (newPassword: string) => {
         if (!newPassword) { alert('Ingresá una nueva contraseña'); return; }
-        if (loggedUser.id === 0) { alert('La cuenta master no se puede modificar desde aquí'); return; }
+        if (loggedUser.id === 0 || loggedUser.username?.toLowerCase() === 'master') { alert('La cuenta master no se puede modificar desde aquí'); return; }
         try {
           const payload = { name: loggedUser.name, username: loggedUser.username || loggedUser.name, role: loggedUser.role, shift: loggedUser.shift || 'Mañana', password: newPassword };
           const res = await fetch(`${API_URL}/admin/staff/${loggedUser.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -1853,7 +1847,7 @@ export default function AdminDashboard() {
         } catch(e) { alert('Error de conexión al guardar la contraseña'); }
       }} />;
       case 'Staff': return (userRole === 'gerente' || userRole === 'administracion') ? <StaffModule staff={staff} onEdit={(s: any) => { setSelectedItem({...s}); setIsEditMode(true); setModalType('staff'); setIsModalOpen(true); }} onDelete={(id: any) => { showConfirm("¿Eliminar empleado?", "¿Estás seguro de que deseas eliminar este empleado?", async () => { const res = await fetch(`${API_URL}/admin/staff/${id}`, {method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={() => { setSelectedItem({name:'', role:'Entrenador', shift:'Mañana', password:'1234'}); setIsEditMode(false); setModalType('staff'); setIsModalOpen(true); }} /> : <NoAccess />;
-      case 'Sistema': return loggedUser?.id === 0 ? <SystemModule API_URL={API_URL} licenseInfo={licenseInfo} onRenewLicense={async () => {
+      case 'Sistema': return (loggedUser?.id === 0 || loggedUser?.username?.toLowerCase() === 'master') ? <SystemModule API_URL={API_URL} licenseInfo={licenseInfo} onRenewLicense={async () => {
         showConfirm("Confirmar Renovación", "¿Desea marcar la licencia como AL DIA para el mes en curso?", async () => {
           try {
             const currentHistory = Array.isArray((licenseInfo as any)?.history) ? (licenseInfo as any).history : [];
@@ -2197,7 +2191,7 @@ export default function AdminDashboard() {
             <>
               <div className="h-px bg-gray-200 dark:bg-white/5 my-4" />
               <SidebarItem icon={<DollarSign size={14} />} label="Finanzas" active={activeTab === 'Finanzas'} onClick={() => setActiveTab('Finanzas')} />
-              {loggedUser?.id === 0 && (
+              {(loggedUser?.id === 0 || loggedUser?.username?.toLowerCase() === 'master') && (
                 <SidebarItem icon={<Settings size={14} />} label="Sistema" active={activeTab === 'Sistema'} onClick={() => setActiveTab('Sistema')} />
               )}
             </>
