@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from .database import get_db
 from . import models
@@ -216,8 +216,13 @@ def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
     else:
         message = "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
 
-    default_phone = os.getenv("WHATSAPP_PHONE", "+5493516002716")
-    target_phone = (member.phone or default_phone).strip()
+    env_phone = (os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
+    target_phone = (member.phone or env_phone).strip()
+    if not target_phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Variable de entorno VITE_WHATSAPP_PHONE o WHATSAPP_PHONE no configurada y el socio no tiene teléfono registrado."
+        )
     clean_digits = re.sub(r"\D", "", target_phone)
     if clean_digits.startswith("0"):
         clean_digits = clean_digits[1:]
@@ -240,7 +245,7 @@ def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
     }
 
 @router.post("/members/{member_id}/send_whatsapp")
-def send_member_whatsapp(member_id: int, db: Session = Depends(get_db)):
+def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: Session = Depends(get_db)):
     import os
     import re
     import urllib.request
@@ -263,7 +268,18 @@ def send_member_whatsapp(member_id: int, db: Session = Depends(get_db)):
     else:
         message = "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
 
-    sender_phone = os.getenv("WHATSAPP_PHONE", "+5493516002716")
+    sender_phone = ""
+    if payload and isinstance(payload, dict):
+        sender_phone = (payload.get("sender_phone") or "").strip()
+    if not sender_phone:
+        sender_phone = (os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
+
+    if not sender_phone and not member.phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Variable de entorno VITE_WHATSAPP_PHONE o WHATSAPP_PHONE no configurada."
+        )
+
     target_phone = (member.phone or sender_phone).strip()
     clean_digits = re.sub(r"\D", "", target_phone)
     if clean_digits.startswith("0"):

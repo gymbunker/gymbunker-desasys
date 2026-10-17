@@ -2486,10 +2486,14 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
   const handleSendWhatsApp = async (m: any) => {
     setSendingWsId(m.id);
     try {
+      const envSenderPhone = (import.meta as any).env?.VITE_WHATSAPP_PHONE || '';
       const targetApi = API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? "http://localhost:8000" : "/api");
       const res = await fetch(`${targetApi}/admin/members/${m.id}/send_whatsapp`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender_phone: envSenderPhone || undefined
+        })
       });
       if (res.ok) {
         const data = await res.json();
