@@ -90,6 +90,17 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
         db.commit()
         
     streak_count, streak_msg = calculate_member_streak_and_message(member.id, db)
+    
+    active_routine = member.routine
+    active_docs = getattr(member, 'routine_documents', []) or []
+    if member.training_plan_id:
+        plan = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == member.training_plan_id).first()
+        if plan:
+            if not active_routine or len(active_routine) == 0 or (len(active_routine) == 1 and len(active_routine[0].get('exercises', [])) == 0):
+                active_routine = plan.days or []
+            if not active_docs or len(active_docs) == 0:
+                active_docs = plan.documents or []
+
     return {
         "status": "success",
         "member": {
@@ -100,8 +111,9 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
             "email": member.email,
             "membership_type": member.membership_type,
             "status": member.status,
-            "routine": member.routine,
-            "routine_documents": getattr(member, 'routine_documents', []) or [],
+            "routine": active_routine,
+            "routine_documents": active_docs,
+            "training_plan_id": member.training_plan_id,
             "streak": streak_count,
             "streak_message": streak_msg
         }
@@ -209,6 +221,16 @@ def get_user_full_info(dni: str, db: Session = Depends(get_db)):
 
     streak_count, streak_msg = calculate_member_streak_and_message(member.id, db)
 
+    active_routine = member.routine
+    active_docs = getattr(member, 'routine_documents', []) or []
+    if member.training_plan_id:
+        plan = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == member.training_plan_id).first()
+        if plan:
+            if not active_routine or len(active_routine) == 0 or (len(active_routine) == 1 and len(active_routine[0].get('exercises', [])) == 0):
+                active_routine = plan.days or []
+            if not active_docs or len(active_docs) == 0:
+                active_docs = plan.documents or []
+
     return {
         "status": "success",
         "member": {
@@ -220,8 +242,9 @@ def get_user_full_info(dni: str, db: Session = Depends(get_db)):
             "membership_type": member.membership_type,
             "additional_plans": add_plans,
             "status": member.status,
-            "routine": member.routine,
-            "routine_documents": getattr(member, 'routine_documents', []) or [],
+            "routine": active_routine,
+            "routine_documents": active_docs,
+            "training_plan_id": member.training_plan_id,
             "streak": streak_count,
             "streak_message": streak_msg
         },

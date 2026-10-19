@@ -1971,9 +1971,19 @@ export default function AdminDashboard() {
       )}
 
       {/* Portaled Modals (Centered in Viewport) */}
-      {(isModalOpen || isPaymentModalOpen) && (
+      {isModalOpen && modalType === 'member' && (
+        <MemberModal 
+          member={selectedItem} 
+          plans={plans} 
+          API_URL={API_URL} 
+          onSave={handleSaveMember} 
+          onClose={() => setIsModalOpen(false)} 
+        />
+      )}
+
+      {((isModalOpen && modalType !== 'member') || isPaymentModalOpen) && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-10 bg-black/50 dark:bg-black/90 backdrop-blur-md overflow-y-auto">
-          {isModalOpen && (
+          {isModalOpen && modalType !== 'member' && (
             <div className={`bg-white dark:bg-neutral-900 border border-gray-200 dark:border-white/10 p-8 rounded-[40px] w-full ${modalType === 'workout' || modalType === 'history' ? 'max-w-4xl' : 'max-w-md'} shadow-2xl animate-in zoom-in duration-300`}>
               <div className="flex justify-between items-center mb-6"><h2 className="text-lg font-black uppercase tracking-widest text-orange-500">{modalType}</h2><button onClick={() => setIsModalOpen(false)}><X size={20} className="text-gray-400 hover:text-black dark:text-white/20 dark:hover:text-white transition-colors"/></button></div>
               <div className="space-y-3">
@@ -2073,15 +2083,6 @@ export default function AdminDashboard() {
                      </div>
                   </div>
                 )}
-                {modalType === 'member' && (
-                  <MemberModal 
-                    member={selectedItem} 
-                    plans={plans} 
-                    API_URL={API_URL} 
-                    onSave={handleSaveMember} 
-                    onClose={() => setIsModalOpen(false)} 
-                  />
-                )}
                 {modalType === 'plan' && (
                   <div className="space-y-3">
                     <div className="space-y-1">
@@ -2150,7 +2151,7 @@ export default function AdminDashboard() {
                 )}
               </div>
               {modalType !== 'history' && (
-                <div className="flex gap-4 mt-8 border-t border-gray-200 dark:border-white/5 pt-6"><button className="flex-1 py-3 text-gray-600 dark:text-white/40 font-black uppercase text-[10px]" onClick={() => setIsModalOpen(false)}>Cancelar</button><button className="flex-1 py-3 bg-orange-500 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-orange-500/20" onClick={() => { if(modalType==='plan') handleSavePlan(); else if(modalType==='member') handleSaveMember(); else if(modalType==='staff') handleSaveStaff(); }}>Guardar</button></div>
+                <div className="flex gap-4 mt-8 border-t border-gray-200 dark:border-white/5 pt-6"><button className="flex-1 py-3 text-gray-600 dark:text-white/40 font-black uppercase text-[10px]" onClick={() => setIsModalOpen(false)}>Cancelar</button><button className="flex-1 py-3 bg-orange-500 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-orange-500/20" onClick={() => { if(modalType==='plan') handleSavePlan(); else if(modalType==='staff') handleSaveStaff(); }}>Guardar</button></div>
               )}
             </div>
           )}

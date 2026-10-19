@@ -187,6 +187,12 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         else:
             setattr(db_member, key, value)
 
+    from sqlalchemy.orm.attributes import flag_modified
+    if 'routine' in data:
+        flag_modified(db_member, 'routine')
+    if 'routine_documents' in data:
+        flag_modified(db_member, 'routine_documents')
+
     db.commit()
     db.refresh(db_member)
     return db_member
@@ -887,6 +893,7 @@ def create_training_plan(payload: dict = Body(...), db: Session = Depends(get_db
 
 @router.put("/training_plans/{plan_id}")
 def update_training_plan(plan_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    from sqlalchemy.orm.attributes import flag_modified
     plan = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == plan_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail="Plan de entrenamiento no encontrado")
@@ -899,8 +906,20 @@ def update_training_plan(plan_id: int, payload: dict = Body(...), db: Session = 
         plan.category = payload["category"]
     if "days" in payload:
         plan.days = payload["days"]
+        flag_modified(plan, "days")
     if "documents" in payload:
         plan.documents = payload["documents"]
+        flag_modified(plan, "documents")
+
+    # Auto-sync members that have this plan assigned
+    members_with_plan = db.query(models.Member).filter(models.Member.training_plan_id == plan_id).all()
+    for m in members_with_plan:
+        if "days" in payload:
+            m.routine = payload["days"]
+            flag_modified(m, "routine")
+        if "documents" in payload:
+            m.routine_documents = payload["documents"]
+            flag_modified(m, "routine_documents")
         
     db.commit()
     db.refresh(plan)
@@ -912,6 +931,30 @@ def update_training_plan(plan_id: int, payload: dict = Body(...), db: Session = 
         "days": plan.days,
         "documents": plan.documents
     }
+
+@router.post("/training_plans/{plan_id}/assign")
+def assign_training_plan(plan_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    from sqlalchemy.orm.attributes import flag_modified
+    plan = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan de entrenamiento no encontrado")
+
+    member_ids = payload.get("member_ids", [])
+    if not member_ids:
+        raise HTTPException(status_code=400, detail="Debes seleccionar al menos un socio")
+
+    updated_count = 0
+    members = db.query(models.Member).filter(models.Member.id.in_(member_ids)).all()
+    for m in members:
+        m.training_plan_id = plan.id
+        m.routine = plan.days or []
+        m.routine_documents = plan.documents or []
+        flag_modified(m, "routine")
+        flag_modified(m, "routine_documents")
+        updated_count += 1
+
+    db.commit()
+    return {"status": "success", "updated_members": updated_count}
 
 @router.delete("/training_plans/{plan_id}")
 def delete_training_plan(plan_id: int, db: Session = Depends(get_db)):

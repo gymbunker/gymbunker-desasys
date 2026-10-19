@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Trash2, X, Edit2, FileText, Upload, Plus, Dumbbell, Layers, Check, ExternalLink, Paperclip, Loader2 } from 'lucide-react';
+import { Search, Trash2, X, Edit2, FileText, Upload, Plus, Dumbbell, Layers, Check, ExternalLink, Paperclip, Loader2, UserCheck } from 'lucide-react';
 
 export default function EntrenamientosModule({ API_URL }: any) {
   const [activeModuleTab, setActiveModuleTab] = useState<'exercises' | 'plans'>('exercises');
@@ -342,6 +342,75 @@ export default function EntrenamientosModule({ API_URL }: any) {
     setSelectedZone('Todas');
   }, [selectedSegment]);
 
+  // Plan Exercises Category & Zone Filters
+  const [planSelectedSegment, setPlanSelectedSegment] = useState<string>('Todos');
+  const [planSelectedZone, setPlanSelectedZone] = useState<string>('Todas');
+  const planAvailableZones = planSelectedSegment === 'Todos' 
+    ? [] 
+    : Array.from(new Set(exercises.filter(e => e.segment === planSelectedSegment).map(e => e.zone))).filter(Boolean);
+
+  useEffect(() => {
+    setPlanSelectedZone('Todas');
+  }, [planSelectedSegment]);
+
+  // Modal: Asignar Plan a Socios
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assigningPlan, setAssigningPlan] = useState<any>(null);
+  const [membersList, setMembersList] = useState<any[]>([]);
+  const [assignMemberSearch, setAssignMemberSearch] = useState('');
+  const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const handleOpenAssignModal = async (plan: any) => {
+    setAssigningPlan(plan);
+    setIsAssignModalOpen(true);
+    setAssignMemberSearch('');
+    try {
+      const res = await fetch(`${API_URL}/admin/members`);
+      if (res.ok) {
+        const data = await res.json();
+        setMembersList(data);
+        const alreadyAssigned = data.filter((m: any) => m.training_plan_id === plan.id).map((m: any) => m.id);
+        setSelectedMemberIds(alreadyAssigned);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleMemberSelect = (memberId: number) => {
+    setSelectedMemberIds(prev => 
+      prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId]
+    );
+  };
+
+  const handleConfirmAssign = async () => {
+    if (!assigningPlan) return;
+    if (selectedMemberIds.length === 0) {
+      alert("Seleccioná al menos un socio para asignarle el plan.");
+      return;
+    }
+    setIsAssigning(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/training_plans/${assigningPlan.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_ids: selectedMemberIds })
+      });
+      if (res.ok) {
+        alert(`¡Plan "${assigningPlan.name}" asignado con éxito a ${selectedMemberIds.length} socio(s)!`);
+        setIsAssignModalOpen(false);
+      } else {
+        alert("Error al asignar el plan a los socios.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error de conexión al asignar el plan.");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const filteredExercises = exercises.filter(e => {
     const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                        (e.muscle_group && e.muscle_group.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -576,6 +645,14 @@ export default function EntrenamientosModule({ API_URL }: any) {
                       </div>
                     )}
                   </div>
+
+                  {/* Assign to members button */}
+                  <button
+                    onClick={() => handleOpenAssignModal(plan)}
+                    className="w-full mt-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-black font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <UserCheck size={14} /> Asignar a Socio(s)
+                  </button>
                 </div>
               );
             })}
@@ -857,14 +934,62 @@ export default function EntrenamientosModule({ API_URL }: any) {
                     <input 
                       type="text" 
                       placeholder="Buscar ejercicios..." 
-                      className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-black dark:text-white outline-none"
+                      className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-black dark:text-white outline-none focus:border-orange-500"
                       value={planExSearch}
                       onChange={e => setPlanExSearch(e.target.value)}
                     />
 
+                    {/* Segment Filters */}
+                    <div className="flex flex-wrap gap-1">
+                      {segments.map(seg => (
+                        <button 
+                          key={seg} 
+                          onClick={() => setPlanSelectedSegment(seg)} 
+                          className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${
+                            planSelectedSegment === seg 
+                              ? 'bg-orange-500 text-black shadow-sm' 
+                              : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-white/40 hover:bg-gray-200'
+                          }`}
+                        >
+                          {seg}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Zone Chips if segment is selected */}
+                    {planAvailableZones.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        <button 
+                          onClick={() => setPlanSelectedZone('Todas')} 
+                          className={`px-2 py-0.5 rounded text-[7px] font-bold uppercase transition-all ${
+                            planSelectedZone === 'Todas' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Todas
+                        </button>
+                        {planAvailableZones.map((z: any) => (
+                          <button 
+                            key={z} 
+                            onClick={() => setPlanSelectedZone(z)} 
+                            className={`px-2 py-0.5 rounded text-[7px] font-bold uppercase transition-all ${
+                              planSelectedZone === z ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            {z}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="max-h-64 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
                       {exercises
-                        .filter(ex => ex.name.toLowerCase().includes(planExSearch.toLowerCase()) || (ex.muscle_group && ex.muscle_group.toLowerCase().includes(planExSearch.toLowerCase())))
+                        .filter(ex => {
+                          const matchSearch = ex.name.toLowerCase().includes(planExSearch.toLowerCase()) || 
+                                              (ex.muscle_group && ex.muscle_group.toLowerCase().includes(planExSearch.toLowerCase()));
+                          const matchSegment = planSelectedSegment === 'Todos' || ex.segment === planSelectedSegment;
+                          const matchZone = planSelectedZone === 'Todas' || ex.zone === planSelectedZone;
+                          return matchSearch && matchSegment && matchZone;
+                        })
                         .map(ex => (
                           <button
                             key={ex.id}
@@ -973,6 +1098,124 @@ export default function EntrenamientosModule({ API_URL }: any) {
 
               <button onClick={handleSaveExercise} className="w-full bg-orange-500 text-black font-black text-xs uppercase tracking-widest py-4 rounded-xl mt-4 hover:bg-orange-600 transition-all">
                 {editingId ? 'Guardar Cambios' : 'Crear Ejercicio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: ASIGNAR PLAN A SOCIOS ==================== */}
+      {isAssignModalOpen && assigningPlan && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-white/10 p-6 sm:p-8 rounded-[35px] w-full max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-white/10 mb-4 shrink-0">
+              <div>
+                <h3 className="font-black text-lg uppercase text-black dark:text-white flex items-center gap-2">
+                  <UserCheck className="text-orange-500" size={18} /> Asignar Plan a Socios
+                </h3>
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
+                  Plan: <span className="text-orange-400 font-bold">{assigningPlan.name}</span> ({assigningPlan.days?.length || 0} Días • {assigningPlan.documents?.length || 0} Archivos)
+                </p>
+              </div>
+              <button onClick={() => setIsAssignModalOpen(false)}>
+                <X size={20} className="text-gray-400 hover:text-white" />
+              </button>
+            </div>
+
+            <div className="space-y-3 flex-1 flex flex-col min-h-0">
+              <input
+                type="text"
+                placeholder="BUSCAR SOCIO POR NOMBRE O DNI..."
+                value={assignMemberSearch}
+                onChange={e => setAssignMemberSearch(e.target.value)}
+                className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-black dark:text-white uppercase outline-none focus:border-orange-500 shrink-0"
+              />
+
+              <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold px-1 shrink-0">
+                <span>{selectedMemberIds.length} socio(s) seleccionado(s)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const filtered = membersList.filter(m => 
+                      m.name.toLowerCase().includes(assignMemberSearch.toLowerCase()) || 
+                      m.dni.includes(assignMemberSearch)
+                    );
+                    if (selectedMemberIds.length === filtered.length) {
+                      setSelectedMemberIds([]);
+                    } else {
+                      setSelectedMemberIds(filtered.map(m => m.id));
+                    }
+                  }}
+                  className="text-orange-500 uppercase hover:underline"
+                >
+                  Alternar todos
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1 min-h-0">
+                {membersList
+                  .filter(m => 
+                    m.name.toLowerCase().includes(assignMemberSearch.toLowerCase()) || 
+                    m.dni.includes(assignMemberSearch)
+                  )
+                  .map(member => {
+                    const isSelected = selectedMemberIds.includes(member.id);
+                    const isAlreadyOnThisPlan = member.training_plan_id === assigningPlan.id;
+
+                    return (
+                      <div
+                        key={member.id}
+                        onClick={() => handleToggleMemberSelect(member.id)}
+                        className={`p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? 'bg-orange-500/10 border-orange-500/40 text-black dark:text-white'
+                            : 'bg-gray-50 dark:bg-white/5 border-transparent hover:border-gray-300 dark:hover:border-white/10'
+                        }`}
+                      >
+                        <div className="truncate mr-3">
+                          <p className="text-xs font-black uppercase text-black dark:text-white truncate">
+                            {member.name}
+                          </p>
+                          <p className="text-[8px] text-gray-400">
+                            DNI: {member.dni} • Estado: {member.status}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isAlreadyOnThisPlan && (
+                            <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/15 text-blue-400">
+                              Tiene este plan
+                            </span>
+                          )}
+                          <div
+                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                              isSelected
+                                ? 'bg-orange-500 border-orange-500 text-black'
+                                : 'border-gray-400 dark:border-white/20'
+                            }`}
+                          >
+                            {isSelected && <Check size={12} strokeWidth={3} />}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-white/10 flex justify-end gap-3 shrink-0">
+              <button
+                onClick={() => setIsAssignModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase text-gray-400 hover:bg-white/5 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmAssign}
+                disabled={isAssigning || selectedMemberIds.length === 0}
+                className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all flex items-center gap-2"
+              >
+                {isAssigning ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                Confirmar Asignación ({selectedMemberIds.length})
               </button>
             </div>
           </div>

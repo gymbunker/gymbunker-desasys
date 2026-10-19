@@ -26,6 +26,7 @@ class Member(Base):
     wellness_data = Column(JSON, nullable=True) # {hrv: 65, sleep_quality: 0.8, etc}
     routine = Column(JSON, nullable=True)
     routine_documents = Column(JSON, default=[])
+    training_plan_id = Column(Integer, ForeignKey("training_plans.id"), nullable=True)
     
     payments = relationship("Payment", back_populates="member")
     bookings = relationship("Booking", back_populates="member")

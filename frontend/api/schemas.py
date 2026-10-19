@@ -42,6 +42,7 @@ class MemberBase(BaseModel):
     wellness_data: Optional[Dict] = None
     routine: Optional[List[Dict]] = None
     routine_documents: Optional[List[Dict]] = []
+    training_plan_id: Optional[int] = None
 
 class MemberCreate(BaseModel):
     dni: str
@@ -56,6 +57,7 @@ class MemberCreate(BaseModel):
     joined_at: Optional[datetime] = None
     routine: Optional[List[Dict]] = None
     routine_documents: Optional[List[Dict]] = []
+    training_plan_id: Optional[int] = None
 
 class MemberSchema(MemberBase):
     id: int
@@ -63,6 +65,7 @@ class MemberSchema(MemberBase):
     last_checkin: Optional[datetime] = None
     billing_history: List[Dict] = [] # We'll populate this manually in the route for now
     routine_documents: Optional[List[Dict]] = []
+    training_plan_id: Optional[int] = None
 
     class Config:
         from_attributes = True

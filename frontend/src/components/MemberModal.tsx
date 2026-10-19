@@ -10,6 +10,8 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
   const [routine, setRoutine] = useState<any[]>(member?.routine || []);
   const [routineDocuments, setRoutineDocuments] = useState<any[]>(member?.routine_documents || []);
   const [trainingPlans, setTrainingPlans] = useState<any[]>([]);
+  const [assignedPlanId, setAssignedPlanId] = useState<number | null>(member?.training_plan_id || null);
+  const [appliedPlanNotice, setAppliedPlanNotice] = useState<string>('');
   const [rightPanelTab, setRightPanelTab] = useState<'exercises' | 'plans'>('exercises');
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
@@ -95,6 +97,8 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
     const newDays = JSON.parse(JSON.stringify(plan.days || []));
     setRoutine(newDays);
     setSelectedClassIndex(0);
+    setAssignedPlanId(plan.id);
+    setAppliedPlanNotice(`¡Plan "${plan.name}" cargado con ${newDays.length} día(s)! Guardá los cambios abajo para confirmar.`);
 
     // Also import plan documents if any
     if (plan.documents && plan.documents.length > 0) {
@@ -170,6 +174,7 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
   const handleSaveInternal = () => {
     onSave({ 
       ...formData, 
+      training_plan_id: assignedPlanId,
       routine,
       routine_documents: routineDocuments
     });
@@ -540,11 +545,20 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
           )}
         </div>
 
-        <div className="mt-8 pt-4 border-t border-gray-200 dark:border-white/10 flex justify-end gap-4 shrink-0">
-          <button onClick={onClose} className="px-6 py-3 rounded-xl text-xs font-black uppercase text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Cancelar</button>
-          <button onClick={handleSaveInternal} className="px-8 py-3 bg-orange-500 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
-            <Save size={16} /> Guardar Socio
-          </button>
+        <div className="mt-8 pt-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between gap-4 shrink-0">
+          <div>
+            {appliedPlanNotice && (
+              <span className="text-[10px] font-bold text-green-500 bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-in fade-in">
+                <Check size={12} strokeWidth={3} /> {appliedPlanNotice}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <button onClick={onClose} className="px-6 py-3 rounded-xl text-xs font-black uppercase text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Cancelar</button>
+            <button onClick={handleSaveInternal} className="px-8 py-3 bg-orange-500 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
+              <Save size={16} /> Guardar Socio
+            </button>
+          </div>
         </div>
         
       </div>
