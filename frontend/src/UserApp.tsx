@@ -1,5 +1,5 @@
 import ProgressChart from './components/ProgressChart';
-import { Zap, Dumbbell, Clock, Check, Play, LayoutDashboard, User, TrendingUp, ArrowUpRight, X, Lock, CheckCircle2, AlertTriangle, Info, Receipt, History, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Zap, Dumbbell, Clock, Check, Play, LayoutDashboard, User, TrendingUp, ArrowUpRight, X, Lock, CheckCircle2, AlertTriangle, Info, Receipt, History, FileText, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -61,7 +61,7 @@ export default function UserApp() {
   // User Data State
   const [userData, setUserData] = useState({
     name: "", dni: "", plan: "Miembro", additional_plans: [] as string[], maxDaysPerWeek: 7, streak: 0, streakMessage: "",
-    routine: [] as any[], evolution: [] as any[], attendanceHistory: [] as any[]
+    routine: [] as any[], routine_documents: [] as any[], evolution: [] as any[], attendanceHistory: [] as any[]
   });
 
 
@@ -197,6 +197,7 @@ const fetchUserBookings = async (memberDni: string) => {
           dni: data.member.dni,
           plan: data.member.membership_type,
           routine: Array.isArray(data.member.routine) ? data.member.routine : [],
+          routine_documents: data.member.routine_documents || [],
           streak: data.member.streak || 0,
           streakMessage: data.member.streak_message || "",
           additional_plans: data.member.additional_plans || []
@@ -312,6 +313,7 @@ const fetchUserBookings = async (memberDni: string) => {
           dni: data.member.dni,
           plan: data.member.membership_type,
           routine: loadedRoutine,
+          routine_documents: data.member.routine_documents || [],
           streak: data.member.streak || 0,
           streakMessage: data.member.streak_message || "",
           additional_plans: data.member.additional_plans || []
@@ -642,6 +644,39 @@ const fetchUserBookings = async (memberDni: string) => {
                   </div>
                 ) : (
                   <>
+                    {/* Attached Documents for this Plan / Routine */}
+                    {userData.routine_documents && userData.routine_documents.length > 0 && (
+                      <div className="p-4 rounded-3xl bg-gradient-to-r from-orange-500/15 via-[#141b29] to-blue-500/10 border border-orange-500/30 space-y-2.5 shadow-lg mb-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-orange-400 tracking-widest flex items-center gap-1.5">
+                            <FileText size={14} /> Guías y Documentos de tu Plan
+                          </span>
+                          <span className="text-[9px] text-white/40 font-bold">{userData.routine_documents.length} archivo(s)</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {userData.routine_documents.map((doc: any, dIdx: number) => (
+                            <div key={dIdx} className="flex items-center justify-between p-2.5 rounded-2xl bg-black/40 border border-white/5 hover:border-orange-500/40 transition-all">
+                              <div className="flex items-center gap-2.5 truncate mr-2">
+                                <div className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 font-black text-[9px]">
+                                  DOC
+                                </div>
+                                <span className="text-xs font-bold text-white truncate">{doc.name}</span>
+                              </div>
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={doc.name}
+                                className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-black text-[9px] font-black uppercase rounded-xl tracking-wider transition-all flex items-center gap-1 shrink-0 shadow-md shadow-orange-500/20"
+                              >
+                                <Download size={11} /> Ver / Abrir
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex gap-2 overflow-x-auto pb-2">
                       {userData.routine.map((c: any, idx: number) => (
                         <button key={idx} onClick={() => setSelectedClassIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedClassIndex === idx ? 'bg-[#F38E26]/20 border border-[#F38E26]/40 text-[#F38E26] shadow-md' : 'bg-white/5 border border-white/5 text-white/40 hover:bg-white/10'}`}>

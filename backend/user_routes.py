@@ -101,6 +101,7 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
             "membership_type": member.membership_type,
             "status": member.status,
             "routine": member.routine,
+            "routine_documents": getattr(member, 'routine_documents', []) or [],
             "streak": streak_count,
             "streak_message": streak_msg
         }
@@ -220,6 +221,7 @@ def get_user_full_info(dni: str, db: Session = Depends(get_db)):
             "additional_plans": add_plans,
             "status": member.status,
             "routine": member.routine,
+            "routine_documents": getattr(member, 'routine_documents', []) or [],
             "streak": streak_count,
             "streak_message": streak_msg
         },

@@ -844,6 +844,138 @@ def delete_exercise(ex_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success"}
 
+# -------------------- TRAINING PLANS (PAQUETES DE ENTRENAMIENTO) --------------------
+
+@router.get("/training_plans")
+def get_training_plans(db: Session = Depends(get_db)):
+    plans = db.query(models.TrainingPlan).order_by(models.TrainingPlan.created_at.desc()).all()
+    return [{
+        "id": p.id,
+        "name": p.name,
+        "description": p.description or "",
+        "category": p.category or "General",
+        "days": p.days or [],
+        "documents": p.documents or [],
+        "created_at": p.created_at.isoformat() if p.created_at else None
+    } for p in plans]
+
+@router.post("/training_plans")
+def create_training_plan(payload: dict = Body(...), db: Session = Depends(get_db)):
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre del plan es obligatorio")
+    
+    plan = models.TrainingPlan(
+        name=name,
+        description=payload.get("description", ""),
+        category=payload.get("category", "General"),
+        days=payload.get("days", []),
+        documents=payload.get("documents", [])
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+    return {
+        "id": plan.id,
+        "name": plan.name,
+        "description": plan.description,
+        "category": plan.category,
+        "days": plan.days,
+        "documents": plan.documents,
+        "created_at": plan.created_at.isoformat() if plan.created_at else None
+    }
+
+@router.put("/training_plans/{plan_id}")
+def update_training_plan(plan_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    plan = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan de entrenamiento no encontrado")
+    
+    if "name" in payload:
+        plan.name = payload["name"]
+    if "description" in payload:
+        plan.description = payload["description"]
+    if "category" in payload:
+        plan.category = payload["category"]
+    if "days" in payload:
+        plan.days = payload["days"]
+    if "documents" in payload:
+        plan.documents = payload["documents"]
+        
+    db.commit()
+    db.refresh(plan)
+    return {
+        "id": plan.id,
+        "name": plan.name,
+        "description": plan.description,
+        "category": plan.category,
+        "days": plan.days,
+        "documents": plan.documents
+    }
+
+@router.delete("/training_plans/{plan_id}")
+def delete_training_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan de entrenamiento no encontrado")
+    db.delete(plan)
+    db.commit()
+    return {"status": "success"}
+
+@router.post("/upload_document")
+def upload_document(payload: dict = Body(...)):
+    import os
+    import re
+    import json
+    import base64
+    import urllib.request
+    import logging
+
+    logger = logging.getLogger("document_uploader")
+
+    filename = payload.get("filename", "documento.pdf")
+    base64_data = payload.get("content_base64", "")
+    content_type = payload.get("content_type", "application/pdf")
+
+    blob_token = os.getenv("BLOB_READ_WRITE_TOKEN") or os.getenv("VERCEL_BLOB_READ_WRITE_TOKEN")
+    
+    if blob_token and base64_data:
+        try:
+            raw_base64 = base64_data.split(",")[-1] if "," in base64_data else base64_data
+            raw_bytes = base64.b64decode(raw_base64)
+            clean_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)
+            url = f"https://blob.vercel-storage.com/plans/{clean_name}"
+            
+            req = urllib.request.Request(
+                url,
+                data=raw_bytes,
+                headers={
+                    "Authorization": f"Bearer {blob_token}",
+                    "x-api-version": "7",
+                    "x-add-random-suffix": "true",
+                    "Content-Type": content_type
+                },
+                method="PUT"
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                resp_json = json.loads(resp.read().decode("utf-8"))
+                return {
+                    "url": resp_json.get("url"),
+                    "name": filename,
+                    "storage": "vercel_blob",
+                    "size": len(raw_bytes)
+                }
+        except Exception as e:
+            logger.error(f"Error uploading to Vercel Blob: {e}")
+            
+    # Fallback to data URI
+    data_uri = base64_data if base64_data.startswith("data:") else f"data:{content_type};base64,{base64_data}"
+    return {
+        "url": data_uri,
+        "name": filename,
+        "storage": "inline_data"
+    }
+
 @router.post("/class_schedules/mass")
 def create_mass_class_schedules(payload: schemas.MassClassScheduleSchema, db: Session = Depends(get_db)):
     created_schedules = []

@@ -25,6 +25,7 @@ class Member(Base):
     # Wellness metrics (JSON for flexibility in prototyping)
     wellness_data = Column(JSON, nullable=True) # {hrv: 65, sleep_quality: 0.8, etc}
     routine = Column(JSON, nullable=True)
+    routine_documents = Column(JSON, default=[])
     
     payments = relationship("Payment", back_populates="member")
     bookings = relationship("Booking", back_populates="member")
@@ -127,6 +128,17 @@ class Activity(Base):
     name = Column(String)
     code = Column(String)
     color = Column(String)
+
+class TrainingPlan(Base):
+    __tablename__ = "training_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(String, nullable=True)
+    category = Column(String, default="General")
+    days = Column(JSON, default=[])
+    documents = Column(JSON, default=[])
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class SystemConfig(Base):
     __tablename__ = "system_configs"
