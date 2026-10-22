@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from database import get_db
 import models
 import schemas
 from typing import List
 import datetime
+import threading
+import json
+import urllib.request
+import urllib.parse
+import re
+import os
+import logging
 from sqlalchemy import func
 try:
     from .security import hash_password, verify_password
@@ -101,7 +109,9 @@ def get_all_members(db: Session = Depends(get_db)):
                 new_status = "ACTIVO"
             
             if m.status != new_status:
+                old_status = m.status
                 m.status = new_status
+                notify_member_status_change(m, old_status, new_status, db)
                 updated = True
     if updated:
         db.commit()
@@ -180,6 +190,7 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
             data['status'] = 'POR VENCER'
         else:
             data['status'] = 'ACTIVO'
+    old_status = db_member.status
     for key, value in data.items():
         if key == 'password':
             if value and not value.startswith('pbkdf2:'):
@@ -187,35 +198,135 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         else:
             setattr(db_member, key, value)
 
-    from sqlalchemy.orm.attributes import flag_modified
     if 'routine' in data:
         flag_modified(db_member, 'routine')
     if 'routine_documents' in data:
         flag_modified(db_member, 'routine_documents')
 
+    if db_member.status != old_status:
+        notify_member_status_change(db_member, old_status, db_member.status, db)
+
     db.commit()
     db.refresh(db_member)
     return db_member
 
+def get_whatsapp_status_message(status: str) -> str:
+    st = (status or "ACTIVO").upper().strip()
+    if st in ["ACTIVO", "AL DIA", "AL DÍA"]:
+        return "Hola soy BUNKER BOT de BUNKER GYM, como estas ? como van esos entrenamientos?"
+    elif st == "POR VENCER":
+        return "Hola soy BUNKER BOT de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
+    elif st == "DEUDA":
+        return "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
+    return "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+
+def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str = None) -> bool:
+    logger = logging.getLogger("whatsapp_sender")
+    clean_digits = re.sub(r"\D", "", target_phone or "")
+    if clean_digits.startswith("0"):
+        clean_digits = clean_digits[1:]
+    if not clean_digits.startswith("54") and len(clean_digits) == 10:
+        clean_digits = "549" + clean_digits
+    elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
+        clean_digits = "549" + clean_digits[2:]
+
+    if not clean_digits:
+        logger.warning("[WHATSAPP] Teléfono inválido o vacío para envío.")
+        return False
+
+    sender = sender_phone or os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or ""
+    gateway_url = os.getenv("WHATSAPP_GATEWAY_URL")
+    gateway_token = os.getenv("WHATSAPP_API_TOKEN")
+    meta_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+    meta_token = os.getenv("WHATSAPP_META_TOKEN") or os.getenv("WHATSAPP_API_TOKEN")
+
+    try:
+        if meta_phone_id and meta_token:
+            url = f"https://graph.facebook.com/v19.0/{meta_phone_id}/messages"
+            payload = json.dumps({
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": clean_digits,
+                "type": "text",
+                "text": {"preview_url": False, "body": message}
+            }).encode("utf-8")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {meta_token}"
+            }
+            req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                logger.info(f"[WHATSAPP SENT via Meta Cloud API] To: {clean_digits}")
+                return True
+        elif gateway_url:
+            if "ultramsg.com" in gateway_url:
+                post_data = urllib.parse.urlencode({
+                    "token": gateway_token or "",
+                    "to": clean_digits,
+                    "body": message
+                }).encode("utf-8")
+                headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            else:
+                post_data = json.dumps({
+                    "sender": sender,
+                    "phone": clean_digits,
+                    "to": clean_digits,
+                    "message": message
+                }).encode("utf-8")
+                headers = {"Content-Type": "application/json"}
+                if gateway_token:
+                    headers["Authorization"] = f"Bearer {gateway_token}"
+
+            req = urllib.request.Request(gateway_url, data=post_data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                logger.info(f"[WHATSAPP SENT via Gateway {resp.status}] To: {clean_digits}")
+                return True
+        else:
+            logger.warning("[WHATSAPP] Ni Meta API ni WHATSAPP_GATEWAY_URL configurados.")
+            return False
+    except Exception as e:
+        logger.error(f"[WHATSAPP ERROR] Fallo al enviar a {clean_digits}: {e}")
+        return False
+
+def notify_member_status_change(member: models.Member, old_status: str, new_status: str, db: Session, force: bool = False) -> bool:
+    st = (new_status or "ACTIVO").upper().strip()
+    if st not in ["ACTIVO", "AL DIA", "AL DÍA", "POR VENCER", "DEUDA"]:
+        return False
+
+    wellness = dict(member.wellness_data or {})
+    last_notified = wellness.get("last_wa_notified_status")
+
+    if not force and last_notified == st:
+        return False
+
+    if not force and st in ["ACTIVO", "AL DIA", "AL DÍA"] and old_status not in ["DEUDA", "POR VENCER"]:
+        return False
+
+    wellness["last_wa_notified_status"] = st
+    wellness["last_wa_notified_at"] = datetime.datetime.utcnow().isoformat()
+    member.wellness_data = wellness
+    flag_modified(member, "wellness_data")
+
+    message = get_whatsapp_status_message(st)
+    target_phone = (member.phone or os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
+
+    if target_phone:
+        threading.Thread(
+            target=dispatch_whatsapp_message,
+            args=(target_phone, message),
+            daemon=True
+        ).start()
+        return True
+    return False
+
 @router.get("/members/{member_id}/whatsapp")
 def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
-    import os
-    import re
-    import urllib.parse
-
     member = db.query(models.Member).get(member_id)
     if not member:
         raise HTTPException(status_code=404, detail="Socio no encontrado")
 
     status = (member.status or "ACTIVO").upper().strip()
-    if status in ["ACTIVO", "AL DIA", "AL DÍA"]:
-        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? como van esos entrenamientos?"
-    elif status == "POR VENCER":
-        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
-    elif status == "DEUDA":
-        message = "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
-    else:
-        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+    message = get_whatsapp_status_message(status)
 
     env_phone = (os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
     target_phone = (member.phone or env_phone).strip()
@@ -247,27 +358,12 @@ def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
 
 @router.post("/members/{member_id}/send_whatsapp")
 def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: Session = Depends(get_db)):
-    import os
-    import re
-    import urllib.request
-    import json
-    import logging
-
-    logger = logging.getLogger("whatsapp_sender")
-
     member = db.query(models.Member).get(member_id)
     if not member:
         raise HTTPException(status_code=404, detail="Socio no encontrado")
 
     status = (member.status or "ACTIVO").upper().strip()
-    if status in ["ACTIVO", "AL DIA", "AL DÍA"]:
-        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? como van esos entrenamientos?"
-    elif status == "POR VENCER":
-        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
-    elif status == "DEUDA":
-        message = "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
-    else:
-        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+    message = get_whatsapp_status_message(status)
 
     sender_phone = ""
     if payload and isinstance(payload, dict):
@@ -275,13 +371,13 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
     if not sender_phone:
         sender_phone = (os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
 
-    if not sender_phone and not member.phone:
+    target_phone = (member.phone or sender_phone).strip()
+    if not target_phone:
         raise HTTPException(
             status_code=400,
             detail="Variable de entorno VITE_WHATSAPP_PHONE o WHATSAPP_PHONE no configurada."
         )
 
-    target_phone = (member.phone or sender_phone).strip()
     clean_digits = re.sub(r"\D", "", target_phone)
     if clean_digits.startswith("0"):
         clean_digits = clean_digits[1:]
@@ -290,80 +386,17 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
     elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
         clean_digits = "549" + clean_digits[2:]
 
-    # Check for configured WhatsApp Gateways
-    meta_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-    meta_token = os.getenv("WHATSAPP_META_TOKEN") or os.getenv("WHATSAPP_API_TOKEN")
-    gateway_url = os.getenv("WHATSAPP_GATEWAY_URL")
-    gateway_token = os.getenv("WHATSAPP_API_TOKEN")
+    success = dispatch_whatsapp_message(target_phone, message, sender_phone)
+    if not success:
+        if not os.getenv("WHATSAPP_GATEWAY_URL") and not (os.getenv("WHATSAPP_PHONE_NUMBER_ID") and os.getenv("WHATSAPP_API_TOKEN")):
+            raise HTTPException(
+                status_code=503,
+                detail="Pasarela de WhatsApp no conectada. Para envíos 100% automáticos y silenciosos se requiere configurar en Vercel: WHATSAPP_GATEWAY_URL o (WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_API_TOKEN)."
+            )
+        raise HTTPException(status_code=502, detail="Error al enviar mensaje mediante la Pasarela de WhatsApp.")
 
-    dispatched_via = None
-
-    # 1. Meta WhatsApp Cloud API (Oficial Meta)
-    if meta_phone_id and meta_token:
-        try:
-            url = f"https://graph.facebook.com/v19.0/{meta_phone_id}/messages"
-            payload_data = json.dumps({
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": clean_digits,
-                "type": "text",
-                "text": {"preview_url": False, "body": message}
-            }).encode("utf-8")
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {meta_token}"
-            }
-            req = urllib.request.Request(url, data=payload_data, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                dispatched_via = f"meta_cloud_api_http_{resp.status}"
-        except urllib.error.HTTPError as e:
-            err_content = e.read().decode("utf-8", errors="ignore")
-            logger.error(f"Meta Cloud API error: {err_content}")
-            raise HTTPException(status_code=502, detail=f"Error en Meta Cloud API ({e.code}): {err_content}")
-        except Exception as e:
-            logger.error(f"Error conectando a Meta Cloud API: {e}")
-            raise HTTPException(status_code=502, detail=f"Fallo al conectar con Meta Cloud API: {str(e)}")
-
-    # 2. Universal QR / REST Gateway (UltraMsg, Evolution API, Whapi, etc.)
-    elif gateway_url:
-        try:
-            if "ultramsg.com" in gateway_url:
-                post_data = urllib.parse.urlencode({
-                    "token": gateway_token or "",
-                    "to": clean_digits,
-                    "body": message
-                }).encode("utf-8")
-                headers = {"Content-Type": "application/x-www-form-urlencoded"}
-            else:
-                post_data = json.dumps({
-                    "sender": sender_phone,
-                    "phone": clean_digits,
-                    "to": clean_digits,
-                    "message": message
-                }).encode("utf-8")
-                headers = {"Content-Type": "application/json"}
-                if gateway_token:
-                    headers["Authorization"] = f"Bearer {gateway_token}"
-
-            req = urllib.request.Request(gateway_url, data=post_data, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                dispatched_via = f"gateway_http_{resp.status}"
-        except urllib.error.HTTPError as e:
-            err_content = e.read().decode("utf-8", errors="ignore")
-            logger.error(f"Gateway WhatsApp error: {err_content}")
-            raise HTTPException(status_code=502, detail=f"Error en Gateway WhatsApp ({e.code}): {err_content}")
-        except Exception as e:
-            logger.error(f"Error conectando a Gateway WhatsApp: {e}")
-            raise HTTPException(status_code=502, detail=f"Fallo al enviar mediante Gateway WhatsApp: {str(e)}")
-
-    else:
-        raise HTTPException(
-            status_code=503,
-            detail="Pasarela de WhatsApp no conectada. Para envíos 100% automáticos y silenciosos se requiere configurar en Vercel: WHATSAPP_GATEWAY_URL o (WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_API_TOKEN)."
-        )
-
-    now_iso = datetime.datetime.utcnow().isoformat()
-    logger.info(f"[WHATSAPP SENT via {dispatched_via}] To: {clean_digits} ({member.name}) | Status: {status}")
+    notify_member_status_change(member, member.status, status, db, force=True)
+    db.commit()
 
     return {
         "status": "sent",
@@ -374,8 +407,53 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
         "from": sender_phone,
         "clean_phone": clean_digits,
         "message": message,
-        "dispatched_at": now_iso,
-        "dispatched_via": dispatched_via
+        "dispatched_at": datetime.datetime.utcnow().isoformat()
+    }
+
+@router.post("/members/{member_id}/simulate_transition")
+def simulate_member_transition(member_id: int, payload: dict = Body(default={}), db: Session = Depends(get_db)):
+    member = db.query(models.Member).get(member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Socio no encontrado")
+
+    target_status = (payload.get("to_status") or payload.get("status") or "ACTIVO").upper().strip()
+    valid_statuses = ["ACTIVO", "POR VENCER", "DEUDA"]
+    if target_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Estado inválido. Debe ser uno de: {valid_statuses}")
+
+    old_status = member.status
+    now = datetime.datetime.utcnow()
+
+    membership_type = (member.membership_type or "").upper()
+    total_days = 30
+    if "TRIMESTRAL" in membership_type:
+        total_days = 90
+    elif "SEMESTRAL" in membership_type:
+        total_days = 180
+    elif "ANUAL" in membership_type:
+        total_days = 365
+
+    if target_status == "ACTIVO":
+        member.joined_at = now
+    elif target_status == "POR VENCER":
+        member.joined_at = now - datetime.timedelta(days=max(0, total_days - 3))
+    elif target_status == "DEUDA":
+        member.joined_at = now - datetime.timedelta(days=total_days + 5)
+
+    member.status = target_status
+    # Force notification for test simulation
+    sent = notify_member_status_change(member, old_status, target_status, db, force=True)
+    db.commit()
+
+    return {
+        "success": True,
+        "member_id": member.id,
+        "name": member.name,
+        "phone": member.phone,
+        "old_status": old_status,
+        "new_status": target_status,
+        "notification_dispatched": sent,
+        "message": get_whatsapp_status_message(target_status)
     }
 
 @router.get("/members/{member_id}/checkins")
@@ -494,9 +572,12 @@ def record_payment(member_id: int, amount: float = 0, method: str = "card", proc
         created_at=now
     )
     db.add(payment)
+    old_status = member.status
     member.status = "ACTIVO"
     member.joined_at = now
     db.commit()
+    if old_status and old_status != "ACTIVO":
+        notify_member_status_change(member, old_status, "ACTIVO", db)
     return {"status": "payment recorded", "amount": final_amount, "details": plan_details}
 
 @router.delete("/payments/{payment_id}")

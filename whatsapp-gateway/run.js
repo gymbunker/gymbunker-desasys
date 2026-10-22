@@ -2,70 +2,152 @@ const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
+// Read local .env if present
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const idx = trimmed.indexOf('=');
+      if (idx !== -1) {
+        const k = trimmed.substring(0, idx).trim();
+        const v = trimmed.substring(idx + 1).trim();
+        if (!process.env[k]) process.env[k] = v;
+      }
+    }
+  });
+}
+
+const NGROK_PATH = path.join(__dirname, 'ngrok.exe');
 const CLOUDFLARED_PATH = 'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe';
-const PORT = 3001;
-const TOKEN = 'bunker_wa_secret_2026';
+const PORT = process.env.PORT || 3001;
+const TOKEN = process.env.WHATSAPP_API_TOKEN || 'bunker_wa_secret_2026';
+const NGROK_DOMAIN = process.env.NGROK_DOMAIN || ''; // Dominio estático gratuito de ngrok
 
-console.log('\n======================================================');
-console.log('  Iniciando Pasarela de WhatsApp Bunker Gym...');
-console.log('======================================================\n');
+const LOG_FILE = path.join(__dirname, 'gateway.log');
+function log(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try {
+    fs.appendFileSync(LOG_FILE, line);
+  } catch (e) {}
+  process.stdout.write(line);
+}
 
-// 1. Start WhatsApp Server (Baileys)
+log('======================================================');
+log('  Iniciando Pasarela de WhatsApp Bunker Gym...');
+log('======================================================');
+
+// 1. Iniciar Servidor WhatsApp (Baileys)
 const serverProcess = spawn('node', ['server.js'], {
   cwd: __dirname,
-  stdio: 'inherit',
+  stdio: 'pipe',
   env: { ...process.env, PORT: String(PORT), WHATSAPP_API_TOKEN: TOKEN }
 });
 
+serverProcess.stdout.on('data', (d) => {
+  const text = d.toString();
+  log(`[SERVER] ${text.trim()}`);
+});
+
+serverProcess.stderr.on('data', (d) => {
+  const text = d.toString();
+  log(`[SERVER ERROR] ${text.trim()}`);
+});
+
 serverProcess.on('error', (err) => {
-  console.error('[SERVER ERROR]:', err);
+  log(`[SERVER PROCESS ERROR]: ${err.message}`);
 });
 
-// 2. Start Cloudflare Tunnel
-let cloudflareUrl = null;
-const cloudflared = spawn(CLOUDFLARED_PATH, ['tunnel', '--url', `http://localhost:${PORT}`]);
+// 2. Iniciar Túnel (Preferir Ngrok con dominio estático, o fallback Cloudflare)
+let tunnelUrl = null;
+let tunnelProcess = null;
 
-cloudflared.stderr.on('data', (data) => {
-  const output = data.toString();
-  
-  // Cloudflare prints the URL in stderr
-  const match = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-  if (match && !cloudflareUrl) {
-    cloudflareUrl = match[0];
-    const fullGatewayUrl = `${cloudflareUrl}/send`;
+function saveTunnelInfo(publicUrl) {
+  tunnelUrl = publicUrl;
+  const fullGatewayUrl = `${publicUrl}/send`;
 
-    // Save to file for easy copy/paste
-    fs.writeFileSync(
-      path.join(__dirname, '..', 'whatsapp_tunnel_url.txt'),
-      `URL_PUBLICA_PANEL=${cloudflareUrl}\nWHATSAPP_GATEWAY_URL=${fullGatewayUrl}\nWHATSAPP_API_TOKEN=${TOKEN}\n`
-    );
+  const infoContent = [
+    `# CONFIGURACION PASARELA BUNKER WHATSAPP`,
+    `FECHA_ACTUALIZACION=${new Date().toISOString()}`,
+    `URL_PUBLICA_PANEL=${publicUrl}`,
+    `WHATSAPP_GATEWAY_URL=${fullGatewayUrl}`,
+    `WHATSAPP_API_TOKEN=${TOKEN}`,
+    ``,
+    `# INSTRUCCIONES PARA VERCEL:`,
+    `# 1. En Vercel -> Settings -> Environment Variables:`,
+    `#    WHATSAPP_GATEWAY_URL = ${fullGatewayUrl}`,
+    `#    WHATSAPP_API_TOKEN   = ${TOKEN}`,
+    `# 2. Guardar y hacer Redeploy si es necesario.`
+  ].join('\n');
 
-    console.log('\n**************************************************************');
-    console.log('  [TUNEL CLOUDFLARE ACTIVO]');
-    console.log(`  Panel Local:   http://localhost:${PORT}`);
-    console.log(`  Panel Web:     ${cloudflareUrl}`);
-    console.log('--------------------------------------------------------------');
-    console.log('  CONFIGURACION PARA VERCEL (Environment Variables):');
-    console.log(`  WHATSAPP_GATEWAY_URL = ${fullGatewayUrl}`);
-    console.log(`  WHATSAPP_API_TOKEN   = ${TOKEN}`);
-    console.log('**************************************************************\n');
+  fs.writeFileSync(path.join(__dirname, '..', 'whatsapp_tunnel_url.txt'), infoContent);
 
-    // Automatically open browser on local QR page
-    try {
-      exec(process.platform === 'win32' ? `start http://localhost:${PORT}` : `open http://localhost:${PORT}`);
-    } catch (e) {}
+  log('\n**************************************************************');
+  log(`  [TUNEL ACTIVO]: ${publicUrl}`);
+  log(`  Panel Local:          http://localhost:${PORT}`);
+  log(`  WHATSAPP_GATEWAY_URL: ${fullGatewayUrl}`);
+  log(`  WHATSAPP_API_TOKEN:   ${TOKEN}`);
+  log('**************************************************************\n');
+}
+
+// Intentar Ngrok primero
+if (fs.existsSync(NGROK_PATH)) {
+  log('Iniciando túnel seguro con Ngrok...');
+  const ngrokArgs = ['http', String(PORT), '--log=stdout'];
+  if (NGROK_DOMAIN) {
+    ngrokArgs.push(`--domain=${NGROK_DOMAIN}`);
+    log(`Usando dominio estático Ngrok: ${NGROK_DOMAIN}`);
   }
-});
 
-cloudflared.on('error', (err) => {
-  console.error('[CLOUDFLARED ERROR]:', err);
-});
+  tunnelProcess = spawn(NGROK_PATH, ngrokArgs, { cwd: __dirname });
 
-// Handle graceful shutdown
+  tunnelProcess.stdout.on('data', (data) => {
+    const out = data.toString();
+    const match = out.match(/url=(https:\/\/[a-zA-Z0-9-.]+\.(?:ngrok-free\.app|ngrok\.io|ngrok\.app))/i);
+    if (match && !tunnelUrl) {
+      saveTunnelInfo(match[1]);
+    }
+  });
+
+  tunnelProcess.stderr.on('data', (data) => {
+    log(`[NGROK] ${data.toString().trim()}`);
+  });
+
+  tunnelProcess.on('error', (err) => {
+    log(`[NGROK ERROR]: ${err.message}. Probando fallback Cloudflare...`);
+    startCloudflare();
+  });
+} else {
+  startCloudflare();
+}
+
+function startCloudflare() {
+  if (!fs.existsSync(CLOUDFLARED_PATH)) {
+    log('[TUNEL] Ni Ngrok ni Cloudflared se encontraron instalados.');
+    return;
+  }
+  log('Iniciando túnel Cloudflare...');
+  tunnelProcess = spawn(CLOUDFLARED_PATH, ['tunnel', '--url', `http://localhost:${PORT}`]);
+
+  tunnelProcess.stderr.on('data', (data) => {
+    const output = data.toString();
+    const match = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+    if (match && !tunnelUrl) {
+      saveTunnelInfo(match[0]);
+    }
+  });
+
+  tunnelProcess.on('error', (err) => {
+    log(`[CLOUDFLARED ERROR]: ${err.message}`);
+  });
+}
+
+// Limpieza al cerrar
 function cleanup() {
-  console.log('\n[CERRANDO SERVICIOS]...');
-  try { serverProcess.kill(); } catch (e) {}
-  try { cloudflared.kill(); } catch (e) {}
+  log('[CERRANDO SERVICIOS]...');
+  try { if (serverProcess) serverProcess.kill(); } catch (e) {}
+  try { if (tunnelProcess) tunnelProcess.kill(); } catch (e) {}
   process.exit();
 }
 
