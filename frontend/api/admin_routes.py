@@ -214,13 +214,13 @@ def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
 
     status = (member.status or "ACTIVO").upper().strip()
     if status in ["ACTIVO", "AL DIA", "AL DÍA"]:
-        message = "Hola soy BUNKER de BUNKER GYM, como estas ? como van esos entrenamientos?"
+        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? como van esos entrenamientos?"
     elif status == "POR VENCER":
-        message = "Hola soy BUNKER de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
+        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
     elif status == "DEUDA":
-        message = "Hola soy BUNKER de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
+        message = "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
     else:
-        message = "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
 
     env_phone = (os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
     target_phone = (member.phone or env_phone).strip()
@@ -266,13 +266,13 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
 
     status = (member.status or "ACTIVO").upper().strip()
     if status in ["ACTIVO", "AL DIA", "AL DÍA"]:
-        message = "Hola soy BUNKER de BUNKER GYM, como estas ? como van esos entrenamientos?"
+        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? como van esos entrenamientos?"
     elif status == "POR VENCER":
-        message = "Hola soy BUNKER de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
+        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
     elif status == "DEUDA":
-        message = "Hola soy BUNKER de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
+        message = "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
     else:
-        message = "Hola soy BUNKER de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
+        message = "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
 
     sender_phone = ""
     if payload and isinstance(payload, dict):
