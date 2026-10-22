@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -52,8 +52,7 @@ cloudflared.stderr.on('data', (data) => {
 
     // Automatically open browser on local QR page
     try {
-      const openCmd = process.platform === 'win32' ? 'start' : 'open';
-      spawn(openCmd, [`http://localhost:${PORT}`], { shell: true });
+      exec(process.platform === 'win32' ? `start http://localhost:${PORT}` : `open http://localhost:${PORT}`);
     } catch (e) {}
   }
 });

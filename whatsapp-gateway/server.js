@@ -38,7 +38,6 @@ async function startWhatsApp() {
     sock = makeWASocket({
       version,
       auth: state,
-      printQRInTerminal: true,
       logger: pino({ level: 'silent' }),
       browser: ['Bunker Gym OS', 'Chrome', '1.0.0'],
       syncFullHistory: false
