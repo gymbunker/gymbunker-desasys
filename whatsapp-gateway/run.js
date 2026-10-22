@@ -96,7 +96,7 @@ if (fs.existsSync(NGROK_PATH)) {
   log('Iniciando túnel seguro con Ngrok...');
   const ngrokArgs = ['http', String(PORT), '--log=stdout'];
   if (NGROK_DOMAIN) {
-    ngrokArgs.push(`--domain=${NGROK_DOMAIN}`);
+    ngrokArgs.push(`--url=${NGROK_DOMAIN}`);
     log(`Usando dominio estático Ngrok: ${NGROK_DOMAIN}`);
   }
 
@@ -104,7 +104,7 @@ if (fs.existsSync(NGROK_PATH)) {
 
   tunnelProcess.stdout.on('data', (data) => {
     const out = data.toString();
-    const match = out.match(/url=(https:\/\/[a-zA-Z0-9-.]+\.(?:ngrok-free\.app|ngrok\.io|ngrok\.app))/i);
+    const match = out.match(/url=(https:\/\/[^\s\r\n]+)/i);
     if (match && !tunnelUrl) {
       saveTunnelInfo(match[1]);
     }
@@ -112,6 +112,13 @@ if (fs.existsSync(NGROK_PATH)) {
 
   tunnelProcess.stderr.on('data', (data) => {
     log(`[NGROK] ${data.toString().trim()}`);
+  });
+
+  tunnelProcess.on('exit', (code) => {
+    if (code !== 0 && !tunnelUrl) {
+      log(`[NGROK] Cerró con código ${code}. Iniciando fallback con Cloudflare...`);
+      startCloudflare();
+    }
   });
 
   tunnelProcess.on('error', (err) => {
