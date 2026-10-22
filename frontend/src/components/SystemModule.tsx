@@ -69,11 +69,15 @@ export default function SystemModule({ API_URL, licenseInfo, onRenewLicense }: {
       } catch (e) {}
     }
 
-    let bgClass = "bg-green-50 dark:bg-green-950/40 border-green-300 dark:border-green-700/60 text-green-700 dark:text-green-400";
-    let badgeClass = "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300";
-    let Icon = CheckCircle;
+    let bgClass = "bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-700/60 text-red-700 dark:text-red-400";
+    let badgeClass = "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300";
+    let Icon = XCircle;
 
-    if (status === 'POR VENCER') {
+    if (status === 'AL DIA' || status === 'AL DÍA' || status === 'ACTIVO') {
+      bgClass = "bg-green-50 dark:bg-green-950/40 border-green-300 dark:border-green-700/60 text-green-700 dark:text-green-400";
+      badgeClass = "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300";
+      Icon = CheckCircle;
+    } else if (status === 'POR VENCER') {
       bgClass = "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/60 text-amber-700 dark:text-amber-400";
       badgeClass = "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300";
       Icon = AlertTriangle;

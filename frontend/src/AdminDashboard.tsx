@@ -1443,15 +1443,19 @@ export default function AdminDashboard() {
     if (!licenseInfo) return null;
     const { status } = licenseInfo;
 
-    let bgClass = "bg-green-50 dark:bg-green-950/40 border border-green-300 dark:border-green-700/60 text-green-700 dark:text-green-400";
-    let badgeClass = "text-green-600 dark:text-green-300 font-bold";
-    let Icon = CheckCircle;
+    let bgClass = "bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700/60 text-red-700 dark:text-red-400";
+    let badgeClass = "text-red-600 dark:text-red-300 font-bold";
+    let Icon = XCircle;
 
-    if (status === 'POR VENCER') {
+    if (status === 'AL DIA' || status === 'AL DÍA' || status === 'ACTIVO') {
+      bgClass = "bg-green-50 dark:bg-green-950/40 border border-green-300 dark:border-green-700/60 text-green-700 dark:text-green-400";
+      badgeClass = "text-green-600 dark:text-green-300 font-bold";
+      Icon = CheckCircle;
+    } else if (status === 'POR VENCER') {
       bgClass = "bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-amber-700 dark:text-amber-400";
       badgeClass = "text-amber-600 dark:text-amber-300 font-bold";
       Icon = AlertTriangle;
-    } else if (status === 'VENCIDA') {
+    } else if (status === 'DEUDA' || status === 'VENCIDA') {
       bgClass = "bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700/60 text-red-700 dark:text-red-400";
       badgeClass = "text-red-600 dark:text-red-300 font-bold";
       Icon = XCircle;
@@ -1467,12 +1471,18 @@ export default function AdminDashboard() {
         "¿Desea marcar la licencia como AL DIA para el mes en curso?",
         async () => {
           try {
-            const res = await fetch(`${API_URL}/admin/license-status`, {
-              method: 'POST'
+            const currentHistory = Array.isArray((licenseInfo as any)?.history) ? (licenseInfo as any).history : [];
+            const newHistory = [{ date: new Date().toISOString(), user: loggedUser?.name || 'Master' }, ...currentHistory].slice(0, 50);
+            const newStatus = { status: 'AL DIA', last_paid_month: new Date().toISOString(), history: newHistory };
+
+            const res = await fetch(`${API_URL}/admin/configs/license_status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ value: newStatus })
             });
             if (res.ok) {
-              const data = await res.json();
-              setLicenseInfo(data);
+              setLicenseInfo(newStatus as any);
+              refreshData();
             } else {
               alert("Error al renovar la licencia");
             }
