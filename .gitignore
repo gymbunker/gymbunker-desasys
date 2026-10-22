@@ -28,3 +28,8 @@ backend/Output/
 *.pt
 *.zip
 backend/logo_B.png
+
+# WhatsApp Gateway
+whatsapp-gateway/node_modules/
+whatsapp-gateway/auth_info/
+whatsapp_tunnel_url.txt
