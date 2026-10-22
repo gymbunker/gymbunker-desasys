@@ -39,10 +39,15 @@ if not exist "node_modules\" (
 echo ==============================================================
 echo Configuración de Ngrok (Dominio permanente)
 echo ==============================================================
-set /p NGROK_TOKEN="Pegá aquí tu Authtoken de Ngrok (o presiona ENTER si ya lo pusiste): "
+set "DEFAULT_TOKEN=3L2II5liPkUz9dUV1U9SLjX32cF_3t7hqpWDrgBepTkqSP5Ru"
+set "NGROK_TOKEN="
+set /p NGROK_TOKEN="Pegá aquí tu Authtoken de Ngrok (o presiona ENTER para usar el tuyo): "
+if "%NGROK_TOKEN%"=="" set "NGROK_TOKEN=%DEFAULT_TOKEN%"
+
 if not "%NGROK_TOKEN%"=="" (
     if exist "ngrok.exe" (
         ngrok.exe config add-authtoken %NGROK_TOKEN%
+        echo [OK] Authtoken de Ngrok configurado con exito.
     ) else (
         echo [AVISO] ngrok.exe no encontrado en esta carpeta.
     )
