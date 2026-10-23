@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info } from 'lucide-react';
+import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -2508,13 +2508,19 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
       });
       if (res.ok) {
         const data = await res.json();
-        showWsToast(`Aviso de WhatsApp enviado a ${m.name} (+${data.clean_phone || 'OK'})`, 'success');
+        if (data.whatsapp_sent && data.email_sent) {
+          showWsToast(`Aviso enviado a ${m.name} por WhatsApp y Correo (${data.email})`, 'success');
+        } else if (data.email_sent && !data.whatsapp_sent) {
+          showWsToast(`Aviso enviado por Correo a ${m.name} (${data.email})`, 'success');
+        } else {
+          showWsToast(`Aviso de WhatsApp enviado a ${m.name} (+${data.clean_phone || 'OK'})`, 'success');
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         showWsToast(`Error al enviar: ${err.detail || res.status}`, 'error');
       }
     } catch (e) {
-      showWsToast(`Error de conexión al enviar WhatsApp`, 'error');
+      showWsToast(`Error de conexión al enviar notificación`, 'error');
     } finally {
       setSendingWsId(null);
     }
@@ -2573,13 +2579,16 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
                 <button 
                   onClick={() => handleSendWhatsApp(m)}
                   disabled={isSending}
-                  title={`Enviar WhatsApp a ${m.name} (${m.status})`}
-                  className="p-2 bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all shadow-sm shrink-0 disabled:opacity-50"
+                  title={`Enviar aviso por WhatsApp${m.email ? ' y Correo' : ''} a ${m.name} (${m.status})`}
+                  className="p-2 bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all shadow-sm shrink-0 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isSending ? (
                     <div className="w-3.5 h-3.5 border-2 border-[#25D366] border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <WhatsAppIcon size={14} />
+                    <>
+                      <WhatsAppIcon size={14} />
+                      {m.email && <Mail size={12} className="opacity-80" />}
+                    </>
                   )}
                 </button>
               </div>

@@ -10,6 +10,9 @@ import threading
 import json
 import urllib.request
 import urllib.parse
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import re
 import os
 import logging
@@ -293,6 +296,114 @@ def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str
         logger.error(f"[WHATSAPP ERROR] Fallo al enviar a {clean_digits}: {e}")
         return False
 
+def get_email_status_details(status: str, member_name: str):
+    st = (status or "ACTIVO").upper().strip()
+    if st in ["ACTIVO", "AL DIA", "AL DÍA"]:
+        subject = f"¡Tu membresía en BUNKER GYM está AL DÍA! 💪"
+        color = "#22c55e"
+        badge = "AL DÍA"
+    elif st == "POR VENCER":
+        subject = f"⚠️ Recordatorio: Tu membresía en BUNKER GYM está por vencer"
+        color = "#f59e0b"
+        badge = "POR VENCER"
+    elif st == "DEUDA":
+        subject = f"🚨 Aviso Importante: Tu membresía en BUNKER GYM figura en deuda"
+        color = "#ef4444"
+        badge = "EN DEUDA"
+    else:
+        subject = f"Aviso de BUNKER GYM para {member_name}"
+        color = "#f97316"
+        badge = st
+    return subject, color, badge
+
+def dispatch_email_message(target_email: str, member_name: str, status: str, message: str) -> bool:
+    logger = logging.getLogger("email_sender")
+    clean_email = (target_email or "").strip()
+    if not clean_email or "@" not in clean_email or "." not in clean_email:
+        logger.warning(f"[EMAIL] Dirección de correo inválida: '{clean_email}'")
+        return False
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "bunkergymcordoba@gmail.com")
+    smtp_pass = os.getenv("SMTP_PASSWORD", "yozjutkccjecbybv").replace(" ", "")
+    from_name = os.getenv("SMTP_FROM_NAME", "BUNKER GYM")
+    from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        logger.warning("[EMAIL] Credenciales SMTP no configuradas.")
+        return False
+
+    subject, color_badge, badge_text = get_email_status_details(status, member_name)
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }}
+    .card {{ max-width: 580px; margin: 0 auto; background: #1e293b; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }}
+    .header {{ background: linear-gradient(135deg, #090d16 0%, #1e293b 100%); padding: 30px; text-align: center; border-bottom: 2px solid #f97316; }}
+    .header h1 {{ margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 2px; color: #f97316; text-transform: uppercase; }}
+    .header p {{ margin: 5px 0 0; font-size: 11px; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; }}
+    .body {{ padding: 35px 30px; line-height: 1.6; font-size: 15px; color: #cbd5e1; }}
+    .greeting {{ font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 15px; }}
+    .status-badge {{ display: inline-block; padding: 6px 16px; border-radius: 9999px; font-size: 12px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; background: {color_badge}22; color: {color_badge}; border: 1px solid {color_badge}66; margin-bottom: 20px; }}
+    .message-box {{ background: rgba(0,0,0,0.25); border-left: 4px solid {color_badge}; border-radius: 8px; padding: 18px; margin: 20px 0; color: #ffffff; font-size: 15px; }}
+    .footer {{ background: #090d16; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid rgba(255,255,255,0.05); }}
+    .footer strong {{ color: #94a3b8; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>BUNKER GYM</h1>
+      <p>Sistema de Gestión &amp; Entrenamiento</p>
+    </div>
+    <div class="body">
+      <div class="status-badge">ESTADO: {badge_text}</div>
+      <div class="greeting">Hola {member_name},</div>
+      <div class="message-box">
+        {message}
+      </div>
+      <p style="font-size: 13px; color: #94a3b8; margin-top: 25px;">
+        Si ya regularizaste tu situación o tenés alguna consulta, no dudes en acercarte a la recepción o comunicarte con el personal de BUNKER GYM.
+      </p>
+    </div>
+    <div class="footer">
+      <p style="margin: 0 0 6px;"><strong>BUNKER GYM CÓRDOBA</strong></p>
+      <p style="margin: 0;">Este es un mensaje automático enviado por el sistema. Por favor no responder a este correo.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    plain_content = f"BUNKER GYM\n\nHola {member_name},\n\nEstado: {badge_text}\n\n{message}\n\nBUNKER GYM CÓRDOBA"
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{from_name} <{from_email}>"
+        msg["To"] = clean_email
+        msg.attach(MIMEText(plain_content, "plain", "utf-8"))
+        msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=12) as server:
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_email, [clean_email], msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=12) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_email, [clean_email], msg.as_string())
+
+        logger.info(f"[EMAIL SENT] To: {clean_email} ({member_name}) | Subject: {subject}")
+        return True
+    except Exception as e:
+        logger.error(f"[EMAIL ERROR] Fallo al enviar a {clean_email}: {e}")
+        return False
+
 def notify_member_status_change(member: models.Member, old_status: str, new_status: str, db: Session, force: bool = False) -> bool:
     st = (new_status or "ACTIVO").upper().strip()
     if st not in ["ACTIVO", "AL DIA", "AL DÍA", "POR VENCER", "DEUDA"]:
@@ -314,15 +425,26 @@ def notify_member_status_change(member: models.Member, old_status: str, new_stat
 
     message = get_whatsapp_status_message(st)
     target_phone = (member.phone or os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
+    target_email = (member.email or "").strip()
+    member_name = member.name or "Socio"
 
+    # 1. Enviar WhatsApp en segundo plano
     if target_phone:
         threading.Thread(
             target=dispatch_whatsapp_message,
             args=(target_phone, message),
             daemon=True
         ).start()
-        return True
-    return False
+
+    # 2. Enviar Correo en segundo plano si tiene email
+    if target_email:
+        threading.Thread(
+            target=dispatch_email_message,
+            args=(target_email, member_name, st, message),
+            daemon=True
+        ).start()
+
+    return bool(target_phone or target_email)
 
 @router.get("/members/{member_id}/whatsapp")
 def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
@@ -357,6 +479,7 @@ def get_member_whatsapp_message(member_id: int, db: Session = Depends(get_db)):
         "status": member.status,
         "phone": target_phone,
         "clean_phone": clean_digits,
+        "email": member.email,
         "message": message,
         "url": wa_url
     }
@@ -377,28 +500,38 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
         sender_phone = (os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or "").strip()
 
     target_phone = (member.phone or sender_phone).strip()
-    if not target_phone:
+    target_email = (member.email or "").strip()
+    member_name = member.name or "Socio"
+
+    if not target_phone and not target_email:
         raise HTTPException(
             status_code=400,
-            detail="Variable de entorno VITE_WHATSAPP_PHONE o WHATSAPP_PHONE no configurada."
+            detail="El socio no tiene ni teléfono ni correo electrónico registrado."
         )
 
-    clean_digits = re.sub(r"\D", "", target_phone)
-    if clean_digits.startswith("0"):
-        clean_digits = clean_digits[1:]
-    if not clean_digits.startswith("54") and len(clean_digits) == 10:
-        clean_digits = "549" + clean_digits
-    elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
-        clean_digits = "549" + clean_digits[2:]
+    clean_digits = ""
+    ws_success = False
+    if target_phone:
+        clean_digits = re.sub(r"\D", "", target_phone)
+        if clean_digits.startswith("0"):
+            clean_digits = clean_digits[1:]
+        if not clean_digits.startswith("54") and len(clean_digits) == 10:
+            clean_digits = "549" + clean_digits
+        elif clean_digits.startswith("54") and not clean_digits.startswith("549") and len(clean_digits) == 12:
+            clean_digits = "549" + clean_digits[2:]
+        ws_success = dispatch_whatsapp_message(target_phone, message, sender_phone)
 
-    success = dispatch_whatsapp_message(target_phone, message, sender_phone)
-    if not success:
-        if not os.getenv("WHATSAPP_GATEWAY_URL") and not (os.getenv("WHATSAPP_PHONE_NUMBER_ID") and os.getenv("WHATSAPP_API_TOKEN")):
+    email_success = False
+    if target_email:
+        email_success = dispatch_email_message(target_email, member_name, status, message)
+
+    if not ws_success and not email_success:
+        if target_phone and not os.getenv("WHATSAPP_GATEWAY_URL") and not (os.getenv("WHATSAPP_PHONE_NUMBER_ID") and os.getenv("WHATSAPP_API_TOKEN")):
             raise HTTPException(
                 status_code=503,
-                detail="Pasarela de WhatsApp no conectada. Para envíos 100% automáticos y silenciosos se requiere configurar en Vercel: WHATSAPP_GATEWAY_URL o (WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_API_TOKEN)."
+                detail="Pasarela de WhatsApp no conectada y no se pudo enviar correo. Verifique la configuración."
             )
-        raise HTTPException(status_code=502, detail="Error al enviar mensaje mediante la Pasarela de WhatsApp.")
+        raise HTTPException(status_code=502, detail="Error al enviar notificación por WhatsApp o Correo.")
 
     notify_member_status_change(member, member.status, status, db, force=True)
     db.commit()
@@ -410,7 +543,10 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
         "name": member.name,
         "member_status": member.status,
         "from": sender_phone,
-        "clean_phone": clean_digits,
+        "clean_phone": clean_digits or None,
+        "whatsapp_sent": bool(ws_success),
+        "email": target_email or None,
+        "email_sent": bool(email_success),
         "message": message,
         "dispatched_at": datetime.datetime.utcnow().isoformat()
     }
@@ -455,6 +591,7 @@ def simulate_member_transition(member_id: int, payload: dict = Body(default={}),
         "member_id": member.id,
         "name": member.name,
         "phone": member.phone,
+        "email": member.email,
         "old_status": old_status,
         "new_status": target_status,
         "notification_dispatched": sent,
