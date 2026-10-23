@@ -17,6 +17,7 @@ import re
 import os
 import logging
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 try:
     from .security import hash_password, verify_password
 except ImportError:
@@ -148,6 +149,16 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     data = member.dict()
     if not data.get('email'):
         data['email'] = None
+    else:
+        clean_email = data['email'].strip().lower()
+        data['email'] = clean_email
+        dup = db.query(models.Member).filter(func.lower(models.Member.email) == clean_email).first()
+        if dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El correo '{clean_email}' ya está registrado para el socio {dup.name} (DNI: {dup.dni})."
+            )
+
     if not data.get('phone'):
         data['phone'] = None
     if not data.get('joined_at'):
@@ -161,6 +172,9 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
         db.refresh(db_member)
         print(f"Member created successfully with ID {db_member.id}")
         return db_member
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado).")
     except Exception as e:
         db.rollback()
         print(f"Error creating member: {e}")
@@ -175,6 +189,19 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
     data = member_data.dict()
     if not data.get('email'):
         data['email'] = None
+    else:
+        clean_email = data['email'].strip().lower()
+        data['email'] = clean_email
+        dup = db.query(models.Member).filter(
+            func.lower(models.Member.email) == clean_email,
+            models.Member.id != member_id
+        ).first()
+        if dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El correo '{clean_email}' ya está registrado para el socio {dup.name} (DNI: {dup.dni})."
+            )
+
     if not data.get('phone'):
         data['phone'] = None
     if not data.get('joined_at'):
@@ -214,9 +241,16 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
     if db_member.status != old_status:
         notify_member_status_change(db_member, old_status, db_member.status, db)
 
-    db.commit()
-    db.refresh(db_member)
-    return db_member
+    try:
+        db.commit()
+        db.refresh(db_member)
+        return db_member
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado en otro socio).")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 def get_whatsapp_status_message(status: str) -> str:
     st = (status or "ACTIVO").upper().strip()
@@ -281,7 +315,11 @@ def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str
                     "to": clean_digits,
                     "message": message
                 }).encode("utf-8")
-                headers = {"Content-Type": "application/json"}
+                headers = {
+                    "Content-Type": "application/json",
+                    "User-Agent": "BunkerGym-WhatsApp-Client/1.0",
+                    "ngrok-skip-browser-warning": "true"
+                }
                 if gateway_token:
                     headers["Authorization"] = f"Bearer {gateway_token}"
 

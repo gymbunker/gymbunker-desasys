@@ -91,8 +91,19 @@ function saveTunnelInfo(publicUrl) {
   log('**************************************************************\n');
 }
 
+function getNgrokExecutable() {
+  const localExe = path.join(__dirname, 'ngrok.exe');
+  if (fs.existsSync(localExe)) return localExe;
+
+  const npmExe = 'C:\\Users\\Nicolas France\\AppData\\Roaming\\npm\\node_modules\\ngrok\\bin\\ngrok.exe';
+  if (fs.existsSync(npmExe)) return npmExe;
+
+  return null;
+}
+
 // Intentar Ngrok primero
-if (fs.existsSync(NGROK_PATH)) {
+const ngrokExe = getNgrokExecutable();
+if (ngrokExe) {
   log('Iniciando túnel seguro con Ngrok...');
   const ngrokArgs = ['http', String(PORT), '--log=stdout'];
   if (NGROK_DOMAIN) {
@@ -100,31 +111,36 @@ if (fs.existsSync(NGROK_PATH)) {
     log(`Usando dominio estático Ngrok: ${NGROK_DOMAIN}`);
   }
 
-  tunnelProcess = spawn(NGROK_PATH, ngrokArgs, { cwd: __dirname });
+  try {
+    tunnelProcess = spawn(ngrokExe, ngrokArgs, { cwd: __dirname });
 
-  tunnelProcess.stdout.on('data', (data) => {
-    const out = data.toString();
-    const match = out.match(/url=(https:\/\/[^\s\r\n]+)/i);
-    if (match && !tunnelUrl) {
-      saveTunnelInfo(match[1]);
-    }
-  });
+    tunnelProcess.stdout.on('data', (data) => {
+      const out = data.toString();
+      const match = out.match(/url=(https:\/\/[^\s\r\n]+)/i);
+      if (match && !tunnelUrl) {
+        saveTunnelInfo(match[1]);
+      }
+    });
 
-  tunnelProcess.stderr.on('data', (data) => {
-    log(`[NGROK] ${data.toString().trim()}`);
-  });
+    tunnelProcess.stderr.on('data', (data) => {
+      log(`[NGROK] ${data.toString().trim()}`);
+    });
 
-  tunnelProcess.on('exit', (code) => {
-    if (code !== 0 && !tunnelUrl) {
-      log(`[NGROK] Cerró con código ${code}. Iniciando fallback con Cloudflare...`);
+    tunnelProcess.on('exit', (code) => {
+      if (code !== 0 && !tunnelUrl) {
+        log(`[NGROK] Cerró con código ${code}. Iniciando fallback con Cloudflare...`);
+        startCloudflare();
+      }
+    });
+
+    tunnelProcess.on('error', (err) => {
+      log(`[NGROK ERROR]: ${err.message}. Probando fallback Cloudflare...`);
       startCloudflare();
-    }
-  });
-
-  tunnelProcess.on('error', (err) => {
-    log(`[NGROK ERROR]: ${err.message}. Probando fallback Cloudflare...`);
+    });
+  } catch (err) {
+    log(`[NGROK SPAWN EXCEPTION]: ${err.message}. Probando fallback Cloudflare...`);
     startCloudflare();
-  });
+  }
 } else {
   startCloudflare();
 }
@@ -135,19 +151,23 @@ function startCloudflare() {
     return;
   }
   log('Iniciando túnel Cloudflare...');
-  tunnelProcess = spawn(CLOUDFLARED_PATH, ['tunnel', '--url', `http://localhost:${PORT}`]);
+  try {
+    tunnelProcess = spawn(CLOUDFLARED_PATH, ['tunnel', '--url', `http://localhost:${PORT}`]);
 
-  tunnelProcess.stderr.on('data', (data) => {
-    const output = data.toString();
-    const match = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-    if (match && !tunnelUrl) {
-      saveTunnelInfo(match[0]);
-    }
-  });
+    tunnelProcess.stderr.on('data', (data) => {
+      const output = data.toString();
+      const match = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+      if (match && !tunnelUrl) {
+        saveTunnelInfo(match[0]);
+      }
+    });
 
-  tunnelProcess.on('error', (err) => {
-    log(`[CLOUDFLARED ERROR]: ${err.message}`);
-  });
+    tunnelProcess.on('error', (err) => {
+      log(`[CLOUDFLARED ERROR]: ${err.message}`);
+    });
+  } catch (err) {
+    log(`[CLOUDFLARED SPAWN EXCEPTION]: ${err.message}`);
+  }
 }
 
 // Limpieza al cerrar
