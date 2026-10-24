@@ -8,7 +8,8 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  Browsers
 } = require('@whiskeysockets/baileys');
 
 const app = express();
@@ -26,6 +27,7 @@ let currentQR = null;
 let currentQRDataUrl = null;
 let connectedUser = null;
 let isConnecting = false;
+const messageStore = new Map();
 
 async function startWhatsApp() {
   if (isConnecting) return;
@@ -39,8 +41,14 @@ async function startWhatsApp() {
       version,
       auth: state,
       logger: pino({ level: 'silent' }),
-      browser: ['Bunker Gym OS', 'Chrome', '1.0.0'],
-      syncFullHistory: false
+      browser: Browsers.windows('Desktop'),
+      syncFullHistory: false,
+      getMessage: async (key) => {
+        if (messageStore.has(key.id)) {
+          return messageStore.get(key.id);
+        }
+        return { conversation: '' };
+      }
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -156,10 +164,39 @@ app.post('/send', authenticate, async (req, res) => {
       cleanPhone = '549' + cleanPhone;
     }
 
-    const jid = `${cleanPhone}@s.whatsapp.net`;
+    // Resolve canonical JID with WhatsApp server to prevent "Esperando el mensaje"
+    let targetJid = `${cleanPhone}@s.whatsapp.net`;
+    try {
+      const check1 = await sock.onWhatsApp(cleanPhone);
+      if (check1 && check1[0]?.exists) {
+        targetJid = check1[0].jid;
+      } else if (cleanPhone.startsWith('549')) {
+        const altPhone = '54' + cleanPhone.slice(3);
+        const check2 = await sock.onWhatsApp(altPhone);
+        if (check2 && check2[0]?.exists) {
+          targetJid = check2[0].jid;
+        }
+      } else if (cleanPhone.startsWith('54') && !cleanPhone.startsWith('549')) {
+        const altPhone = '549' + cleanPhone.slice(2);
+        const check3 = await sock.onWhatsApp(altPhone);
+        if (check3 && check3[0]?.exists) {
+          targetJid = check3[0].jid;
+        }
+      }
+    } catch (checkErr) {
+      console.warn('[WHATSAPP] onWhatsApp verification skipped:', checkErr.message);
+    }
 
-    console.log(`[WHATSAPP DISPATCH] Enviando a: ${cleanPhone}...`);
-    const sent = await sock.sendMessage(jid, { text: String(message) });
+    console.log(`[WHATSAPP DISPATCH] Enviando a JID: ${targetJid}...`);
+    const sent = await sock.sendMessage(targetJid, { text: String(message) });
+
+    if (sent?.key?.id && sent?.message) {
+      messageStore.set(sent.key.id, sent.message);
+      if (messageStore.size > 500) {
+        const firstKey = messageStore.keys().next().value;
+        messageStore.delete(firstKey);
+      }
+    }
 
     console.log(`[WHATSAPP SENT] Mensaje entregado con ID: ${sent.key.id}`);
 
@@ -167,7 +204,7 @@ app.post('/send', authenticate, async (req, res) => {
       success: true,
       status: 'sent',
       messageId: sent.key.id,
-      to: cleanPhone,
+      to: targetJid.replace('@s.whatsapp.net', ''),
       timestamp: new Date().toISOString()
     });
   } catch (err) {
@@ -313,6 +350,11 @@ app.get(['/', '/qr'], (req, res) => {
       <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 20px;">
         La pasarela está lista para despachar recordatorios y notificaciones de forma silenciosa.
       </p>
+      <form action="/reset" method="POST" style="margin-top: 15px;" onsubmit="return confirm('¿Deseas desvincular y escanear un nuevo código QR para renovar las claves de cifrado?');">
+        <button type="submit" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 8px 16px; border-radius: 12px; font-size: 11px; font-weight: 800; cursor: pointer; text-transform: uppercase;">
+          Re-vincular / Renovar Sesión
+        </button>
+      </form>
     ` : `
       <div class="badge disconnected">
         <span class="badge-dot"></span>
@@ -351,6 +393,27 @@ app.get(['/', '/qr'], (req, res) => {
 </body>
 </html>
   `);
+});
+
+// Endpoint para reiniciar y limpiar sesión corrupta
+app.post('/reset', (req, res) => {
+  console.log('\n[WHATSAPP] Reseteando sesión y claves de cifrado a pedido del usuario...');
+  try {
+    if (sock) {
+      sock.end();
+      sock = null;
+    }
+  } catch (e) {}
+  isConnected = false;
+  isConnecting = false;
+  try {
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    console.log('[WHATSAPP] auth_info limpiado.');
+  } catch (e) {}
+  setTimeout(() => {
+    startWhatsApp();
+  }, 1000);
+  res.redirect('/');
 });
 
 // Start listening and launch WhatsApp client
