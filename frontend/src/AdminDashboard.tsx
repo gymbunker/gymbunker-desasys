@@ -1691,8 +1691,13 @@ export default function AdminDashboard() {
             password: formData.password || '123'
           })
         });
-        if (res.ok) refreshData();
-        else alert("Error al actualizar socio");
+        if (res.ok) {
+          refreshData();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Error al actualizar socio");
+          return;
+        }
       } else {
         const res = await fetch(`${API_URL}/admin/members`, {
           method: 'POST',
@@ -1703,10 +1708,15 @@ export default function AdminDashboard() {
             photo_url: `https://i.pravatar.cc/300?u=${formData.dni}`
           })
         });
-        if (res.ok) refreshData();
-        else alert("Error al crear socio. Verifique si el DNI ya existe.");
+        if (res.ok) {
+          refreshData();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Error al crear socio. Verifique si el DNI ya existe.");
+          return;
+        }
       }
-      setIsModalOpen(false);  setIsModalOpen(false);
+      setIsModalOpen(false);
     } catch (e) { console.error(e); }
   };
 

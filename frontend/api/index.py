@@ -15,6 +15,27 @@ from . import totem_routes
 
 models.Base.metadata.create_all(bind=engine)
 
+def auto_migrate():
+    migrations = [
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS fixed_billing_day INTEGER;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS keep_billing_day BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_date TIMESTAMP;",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;"
+    ]
+    for sql in migrations:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as e:
+            print(f"Auto-migration notice ({sql}): {e}")
+
+try:
+    auto_migrate()
+except Exception as e:
+    print(f"Initial auto_migrate error: {e}")
+
+
 # Mock CVEngine for Vercel/Serverless environments where OpenCV fails to load
 try:
     from .cv_engine import CVEngine
@@ -73,6 +94,11 @@ def health_check(db: Session = Depends(get_db)):
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e), "database_url_env": os.getenv("DATABASE_URL") is not None}
+
+@app.get("/migrate")
+def manual_migrate():
+    auto_migrate()
+    return {"status": "ok", "message": "Auto-migration completed successfully"}
 
 @app.get("/debug/db")
 def debug_db():

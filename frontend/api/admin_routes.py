@@ -232,25 +232,37 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         data['phone'] = None
     if not data.get('joined_at'):
         data['joined_at'] = db_member.joined_at
-    # Recalculate status from joined_at so editing the start date reflects correctly
+    # Recalculate status from next_due_date (if present) or joined_at so editing reflects correctly
     joined = data['joined_at']
-    if joined and data.get('status') != 'INACTIVO':
-        days_since = (datetime.datetime.utcnow() - joined).days
-        plan = (data.get('membership_type') or db_member.membership_type or "").upper()
-        total_days = 30
-        if plan == "TRIMESTRAL":
-            total_days = 90
-        elif plan == "SEMESTRAL":
-            total_days = 180
-        elif plan == "ANUAL":
-            total_days = 365
-            
-        if days_since >= total_days:
-            data['status'] = 'DEUDA'
-        elif days_since >= total_days - 7:
-            data['status'] = 'POR VENCER'
-        else:
-            data['status'] = 'ACTIVO'
+    next_due = data.get('next_due_date') or db_member.next_due_date
+    if data.get('status') != 'INACTIVO':
+        if next_due:
+            now_date = datetime.datetime.utcnow().date()
+            due_date = next_due.date() if isinstance(next_due, datetime.datetime) else datetime.date.fromisoformat(str(next_due)[:10])
+            days_until_due = (due_date - now_date).days
+            if days_until_due < 0:
+                data['status'] = 'DEUDA'
+            elif days_until_due <= 7:
+                data['status'] = 'POR VENCER'
+            else:
+                data['status'] = 'ACTIVO'
+        elif joined:
+            days_since = (datetime.datetime.utcnow() - joined).days
+            plan = (data.get('membership_type') or db_member.membership_type or "").upper()
+            total_days = 30
+            if plan == "TRIMESTRAL":
+                total_days = 90
+            elif plan == "SEMESTRAL":
+                total_days = 180
+            elif plan == "ANUAL":
+                total_days = 365
+                
+            if days_since >= total_days:
+                data['status'] = 'DEUDA'
+            elif days_since >= total_days - 7:
+                data['status'] = 'POR VENCER'
+            else:
+                data['status'] = 'ACTIVO'
     old_status = db_member.status
     for key, value in data.items():
         if key == 'password':

@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 import models
 from database import engine, get_db
 
@@ -13,6 +14,27 @@ import user_routes
 import totem_routes
 
 models.Base.metadata.create_all(bind=engine)
+
+def auto_migrate():
+    migrations = [
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS fixed_billing_day INTEGER;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS keep_billing_day BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_date TIMESTAMP;",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;"
+    ]
+    for sql in migrations:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as e:
+            print(f"Auto-migration notice ({sql}): {e}")
+
+try:
+    auto_migrate()
+except Exception as e:
+    print(f"Initial auto_migrate error: {e}")
+
 
 # Mock CVEngine for Vercel/Serverless environments where OpenCV fails to load
 try:

@@ -266,6 +266,56 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
                 <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Fecha de Inicio del Plan</label>
                 <input type="date" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.joined_at ? formData.joined_at.split('T')[0] : ''} onChange={e => setFormData({...formData, joined_at: e.target.value ? e.target.value + 'T00:00:00' : null})} />
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Próximo Vencimiento / Cobro</label>
+                  <input 
+                    type="date" 
+                    className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" 
+                    value={formData?.next_due_date ? formData.next_due_date.split('T')[0] : ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      const day = val ? parseInt(val.split('-')[2], 10) : null;
+                      setFormData({
+                        ...formData, 
+                        next_due_date: val ? val + 'T00:00:00' : null,
+                        fixed_billing_day: formData?.keep_billing_day ? (formData?.fixed_billing_day || day) : formData?.fixed_billing_day
+                      });
+                    }} 
+                  />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-3 p-3.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer hover:border-orange-500/50 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={!!formData?.keep_billing_day} 
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        let fixedDay = formData?.fixed_billing_day;
+                        if (checked && !fixedDay && formData?.next_due_date) {
+                          fixedDay = parseInt(formData.next_due_date.split('T')[0].split('-')[2], 10);
+                        }
+                        setFormData({
+                          ...formData, 
+                          keep_billing_day: checked,
+                          fixed_billing_day: checked ? fixedDay : null
+                        });
+                      }} 
+                      className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500" 
+                    />
+                    <div className="text-left">
+                      <p className="text-[10px] font-black uppercase text-black dark:text-white">Mantener día fijo de cobro</p>
+                      <p className="text-[8px] text-gray-400 dark:text-white/40">
+                        {formData?.keep_billing_day && formData?.fixed_billing_day 
+                          ? `Fijado para el día ${formData.fixed_billing_day} de cada mes`
+                          : 'Mantiene siempre el mismo día cada mes'}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Contraseña de Acceso</label>
                 <input type="text" placeholder="Asignar Contraseña" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
