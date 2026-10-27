@@ -1735,19 +1735,35 @@ export default function AdminDashboard() {
 
   const handlePayment = async (amount: number, method: string) => {
     try {
-      const processedBy = encodeURIComponent(loggedUser?.name || 'Administración');
+      const staffName = loggedUser?.name || 'Administración';
+      const processedBy = encodeURIComponent(staffName);
       const res = await fetch(`${API_URL}/admin/payments?member_id=${selectedItem.id}&amount=${amount}&method=${method}&processed_by=${processedBy}`, {
         method: 'POST'
       });
       if (res.ok) {
-        generatePaymentPDF(selectedItem, amount, method, loggedUser?.name || 'Administración');
+        const pdfBase64 = await generatePaymentPDF(selectedItem, amount, method, staffName);
         setIsPaymentModalOpen(false);
         refreshData();
+
+        // Enviar comprobante automáticamente por Correo (con PDF adjunto y diseño institucional) y WhatsApp en segundo plano
+        const contractedPlansStr = [selectedItem.membership_type || 'Musculación', ...(selectedItem.additional_plans || [])].join(' + ');
+        fetch(`${API_URL}/admin/members/${selectedItem.id}/send_payment_receipt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: amount,
+            method: method,
+            staff_name: staffName,
+            plan: contractedPlansStr,
+            date: new Date().toLocaleDateString('es-AR') + ' ' + new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+            pdf_base64: pdfBase64 || ''
+          })
+        }).catch(err => console.warn('[AUTO-RECEIPT] Error enviando comprobante en segundo plano:', err));
       }
     } catch (e) { console.error(e); }
   };
 
-  const generatePaymentPDF = async (member: any, amount: number, method: string, staffName: string, customDate?: string) => {
+  const generatePaymentPDF = async (member: any, amount: number, method: string, staffName: string, customDate?: string): Promise<string> => {
     const doc = new jsPDF();
 
     const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -1800,9 +1816,6 @@ export default function AdminDashboard() {
     });
 
     // Sello diagonal "PAGADO" centrado en la tabla
-    // align:'center' + angle en jsPDF desplaza el origen → el texto sale del cuadro.
-    // Solución: calcular el punto de inicio manualmente para que el centro visual
-    // quede en (105, tableCenterY).
     const tableEndY = (doc as any).lastAutoTable.finalY || 136;
     const tableCenterY = (55 + tableEndY) / 2;
 
@@ -1810,8 +1823,6 @@ export default function AdminDashboard() {
     const textW = doc.getTextWidth('PAGADO');
     const cos45 = Math.cos(Math.PI / 4);
     const sin45 = Math.sin(Math.PI / 4);
-    // Con angle:45 el texto avanza en dirección (+cos45, -sin45) en coords de pantalla.
-    // Inicio = centro - (textW/2) * dirección
     const stampStartX = 105 - (textW / 2) * cos45;
     const stampStartY = tableCenterY + (textW / 2) * sin45;
 
@@ -1841,6 +1852,14 @@ export default function AdminDashboard() {
     doc.setTextColor(0, 0, 0);
 
     doc.save(`Comprobante_Pago_${member.name.replace(/\\s+/g, '_')}.pdf`);
+
+    try {
+      const dataUri = doc.output('datauristring');
+      return dataUri.split(',')[1] || '';
+    } catch (e) {
+      console.warn('No se pudo obtener base64 del PDF comprobante', e);
+      return '';
+    }
   };
 
   const renderContent = () => {

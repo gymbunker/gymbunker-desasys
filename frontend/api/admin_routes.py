@@ -13,6 +13,9 @@ import urllib.parse
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.application import MIMEApplication
+import base64
 import re
 import os
 import logging
@@ -338,7 +341,7 @@ def get_email_status_details(status: str, member_name: str):
     st = (status or "ACTIVO").upper().strip()
     if st in ["ACTIVO", "AL DIA", "AL DÍA"]:
         subject = f"¡Tu membresía en BUNKER GYM está AL DÍA! 💪"
-        color = "#22c55e"
+        color = "#10b981"
         badge = "AL DÍA"
     elif st == "POR VENCER":
         subject = f"⚠️ Recordatorio: Tu membresía en BUNKER GYM está por vencer"
@@ -348,13 +351,270 @@ def get_email_status_details(status: str, member_name: str):
         subject = f"🚨 Aviso Importante: Tu membresía en BUNKER GYM figura en deuda"
         color = "#ef4444"
         badge = "EN DEUDA"
+    elif st == "PAGO":
+        subject = f"🧾 Comprobante de Pago Oficial - BUNKER GYM"
+        color = "#ff7700"
+        badge = "PAGO ACREDITADO"
     else:
         subject = f"Aviso de BUNKER GYM para {member_name}"
         color = "#f97316"
         badge = st
     return subject, color, badge
 
-def dispatch_email_message(target_email: str, member_name: str, status: str, message: str) -> bool:
+def build_bunker_email_html(
+    member_name: str,
+    status: str,
+    message: str,
+    badge_text: str,
+    color_badge: str,
+    receipt_data: dict = None
+) -> str:
+    receipt_html = ""
+    if receipt_data:
+        amount_fmt = f"{receipt_data.get('amount', 0):,.0f}".replace(",", ".")
+        plan_desc = receipt_data.get("plan", "Cuota de Gimnasio")
+        method_desc = receipt_data.get("method", "Efectivo")
+        date_desc = receipt_data.get("date", datetime.datetime.now().strftime("%d/%m/%Y %H:%M"))
+        staff_desc = receipt_data.get("staff_name", "Administración")
+        has_pdf = receipt_data.get("has_pdf", False)
+
+        pdf_badge = ""
+        if has_pdf:
+            pdf_badge = """
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.4); border-radius: 14px; padding: 14px 18px; text-align: center; font-size: 13px; color: #a7f3d0; margin-top: 20px;">
+              &#128206; <strong>Comprobante adjunto:</strong> Descarg&aacute; el archivo PDF adjunto a este correo para conservar tu constancia oficial de pago.
+            </div>
+            """
+
+        receipt_html = f"""
+        <!-- BLOQUE DE PAGO DESTACADO -->
+        <div style="background: linear-gradient(135deg, rgba(249,115,22,0.16) 0%, rgba(20,25,36,0.85) 100%); border: 1px solid rgba(249,115,22,0.35); border-radius: 20px; padding: 24px; text-align: center; margin: 22px 0;">
+          <div style="font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #10b981; margin-bottom: 6px;">
+            &#10004; PAGO ACREDITADO CON &Eacute;XITO
+          </div>
+          <div style="font-size: 42px; font-weight: 900; color: #ff7700; line-height: 1; letter-spacing: 1px; margin-bottom: 8px;">
+            ${amount_fmt}
+          </div>
+          <div style="font-size: 14px; color: #e2e8f0; font-weight: 700; letter-spacing: 0.5px;">
+            {plan_desc}
+          </div>
+        </div>
+
+        <!-- TABLA DE DETALLES DEL COMPROBANTE -->
+        <table style="width: 100%; border-collapse: separate; border-spacing: 0; background: #161c28; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden; margin-bottom: 15px; font-size: 13px;">
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <td style="padding: 13px 18px; color: #94a3b8; font-weight: 600;">Medio de Pago:</td>
+            <td style="padding: 13px 18px; color: #ffffff; font-weight: 800; text-align: right;">{method_desc}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <td style="padding: 13px 18px; color: #94a3b8; font-weight: 600;">Fecha y Hora:</td>
+            <td style="padding: 13px 18px; color: #ffffff; font-weight: 800; text-align: right;">{date_desc}</td>
+          </tr>
+          <tr>
+            <td style="padding: 13px 18px; color: #94a3b8; font-weight: 600;">Atendido por:</td>
+            <td style="padding: 13px 18px; color: #ffffff; font-weight: 800; text-align: right;">{staff_desc}</td>
+          </tr>
+        </table>
+        {pdf_badge}
+        """
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BUNKER GYM</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #070a0f;
+      margin: 0;
+      padding: 30px 15px;
+      color: #f8fafc;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      max-width: 580px;
+      margin: 0 auto;
+      background: #0f141f;
+      border-radius: 28px;
+      border: 1px solid rgba(249, 115, 22, 0.28);
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.65), 0 0 35px rgba(249,115,22,0.12);
+    }}
+    .header {{
+      background: linear-gradient(180deg, #182030 0%, #0f141f 100%);
+      padding: 38px 24px 24px 24px;
+      text-align: center;
+    }}
+    .logo-img {{
+      height: 72px;
+      max-height: 72px;
+      width: auto;
+      display: block;
+      margin: 0 auto;
+      border: 0;
+      outline: none;
+      filter: drop-shadow(0 4px 10px rgba(249,115,22,0.4));
+    }}
+    .brand-title {{
+      margin: 14px 0 2px 0;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #ff7700;
+      text-transform: uppercase;
+    }}
+    .brand-subtitle {{
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }}
+    .accent-bar {{
+      height: 3px;
+      width: 140px;
+      margin: 18px auto 0 auto;
+      background: linear-gradient(90deg, rgba(249,115,22,0) 0%, #f97316 50%, rgba(249,115,22,0) 100%);
+      border-radius: 999px;
+    }}
+    .content {{
+      padding: 30px 28px 25px 28px;
+      line-height: 1.6;
+    }}
+    .badge-wrap {{
+      text-align: center;
+      margin-bottom: 22px;
+    }}
+    .status-pill {{
+      display: inline-block;
+      padding: 7px 22px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      background: {color_badge}1a;
+      color: {color_badge};
+      border: 1px solid {color_badge}66;
+    }}
+    .member-card {{
+      background: #141a26;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 24px;
+      margin-bottom: 15px;
+    }}
+    .greeting {{
+      font-size: 19px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 14px;
+    }}
+    .message-box {{
+      background: rgba(249, 115, 22, 0.04);
+      border-left: 4px solid {color_badge};
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 16px 0;
+      color: #f1f5f9;
+      font-size: 15px;
+      line-height: 1.6;
+    }}
+    .info-card {{
+      background: #121722;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      padding: 18px;
+      margin-top: 20px;
+      font-size: 12px;
+      color: #94a3b8;
+    }}
+    .footer {{
+      background: #090d14;
+      padding: 26px 20px;
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }}
+    .footer-brand {{
+      margin: 0 0 6px 0;
+      font-size: 12px;
+      font-weight: 800;
+      color: #e2e8f0;
+      letter-spacing: 1.5px;
+    }}
+    .footer-text {{
+      margin: 0;
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.6;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <img src="cid:bunker_logo" alt="BUNKER GYM" class="logo-img" onerror="this.src='https://gymbunker.vercel.app/bunker.png'" />
+      <div class="brand-title">BUNKER GYM</div>
+      <div class="brand-subtitle">CENTRO DE ENTRENAMIENTO &bull; C&Oacute;RDOBA</div>
+      <div class="accent-bar"></div>
+    </div>
+
+    <div class="content">
+      <div class="badge-wrap">
+        <span class="status-pill">&bull; {badge_text}</span>
+      </div>
+
+      <div class="member-card">
+        <div class="greeting">&iexcl;Hola, <strong style="color: #ffffff;">{member_name}</strong>! &#128075;</div>
+        <div class="message-box">
+          {message}
+        </div>
+        {receipt_html}
+      </div>
+
+      <div class="info-card">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #94a3b8;">
+          <tr>
+            <td style="padding: 4px 0; color: #f97316; font-weight: 800; width: 24px;">&#128205;</td>
+            <td style="padding: 4px 0;"><strong style="color: #ffffff;">Sede:</strong> Bunker Gym C&oacute;rdoba</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0; color: #f97316; font-weight: 800;">&#128337;</td>
+            <td style="padding: 4px 0;"><strong style="color: #ffffff;">Horarios:</strong> Lunes a Viernes 07:00 a 23:00 hs &bull; S&aacute;bados 09:00 a 14:00 hs</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0; color: #f97316; font-weight: 800;">&#128170;</td>
+            <td style="padding: 4px 0;"><strong style="color: #ffffff;">Comunidad:</strong> &iexcl;Pasi&oacute;n y compromiso por el entrenamiento!</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-brand">BUNKER GYM C&Oacute;RDOBA</div>
+      <p class="footer-text">
+        Este es un mensaje institucional autom&aacute;tico emitido para <strong>{member_name}</strong>.<br />
+        Por favor no responder a este correo.
+      </p>
+      <p style="margin: 12px 0 0 0; font-size: 10px; color: #475569; letter-spacing: 1px;">
+        &copy; 2026 BUNKER GYM &bull; TODOS LOS DERECHOS RESERVADOS
+      </p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+def dispatch_email_message(
+    target_email: str,
+    member_name: str,
+    status: str,
+    message: str,
+    pdf_base64: str = None,
+    receipt_data: dict = None
+) -> bool:
     logger = logging.getLogger("email_sender")
     clean_email = (target_email or "").strip()
     if not clean_email or "@" not in clean_email or "." not in clean_email:
@@ -374,57 +634,72 @@ def dispatch_email_message(target_email: str, member_name: str, status: str, mes
 
     subject, color_badge, badge_text = get_email_status_details(status, member_name)
 
-    html_content = f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }}
-    .card {{ max-width: 580px; margin: 0 auto; background: #1e293b; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }}
-    .header {{ background: linear-gradient(135deg, #090d16 0%, #1e293b 100%); padding: 30px; text-align: center; border-bottom: 2px solid #f97316; }}
-    .header h1 {{ margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 2px; color: #f97316; text-transform: uppercase; }}
-    .header p {{ margin: 5px 0 0; font-size: 11px; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; }}
-    .body {{ padding: 35px 30px; line-height: 1.6; font-size: 15px; color: #cbd5e1; }}
-    .greeting {{ font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 15px; }}
-    .status-badge {{ display: inline-block; padding: 6px 16px; border-radius: 9999px; font-size: 12px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; background: {color_badge}22; color: {color_badge}; border: 1px solid {color_badge}66; margin-bottom: 20px; }}
-    .message-box {{ background: rgba(0,0,0,0.25); border-left: 4px solid {color_badge}; border-radius: 8px; padding: 18px; margin: 20px 0; color: #ffffff; font-size: 15px; }}
-    .footer {{ background: #090d16; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid rgba(255,255,255,0.05); }}
-    .footer strong {{ color: #94a3b8; }}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="header">
-      <h1>BUNKER GYM</h1>
-      <p>Sistema de Gestión &amp; Entrenamiento</p>
-    </div>
-    <div class="body">
-      <div class="status-badge">ESTADO: {badge_text}</div>
-      <div class="greeting">Hola {member_name},</div>
-      <div class="message-box">
-        {message}
-      </div>
-      <p style="font-size: 13px; color: #94a3b8; margin-top: 25px;">
-        Si ya regularizaste tu situación o tenés alguna consulta, no dudes en acercarte a la recepción o comunicarte con el personal de BUNKER GYM.
-      </p>
-    </div>
-    <div class="footer">
-      <p style="margin: 0 0 6px;"><strong>BUNKER GYM CÓRDOBA</strong></p>
-      <p style="margin: 0;">Este es un mensaje automático enviado por el sistema. Por favor no responder a este correo.</p>
-    </div>
-  </div>
-</body>
-</html>"""
+    html_content = build_bunker_email_html(
+        member_name=member_name,
+        status=status,
+        message=message,
+        badge_text=badge_text,
+        color_badge=color_badge,
+        receipt_data=receipt_data
+    )
 
-    plain_content = f"BUNKER GYM\n\nHola {member_name},\n\nEstado: {badge_text}\n\n{message}\n\nBUNKER GYM CÓRDOBA"
+    clean_plain_message = re.sub(r"<[^>]+>", "", message)
+    plain_content = f"BUNKER GYM - CÓRDOBA\n\nHola {member_name},\n\nEstado: {badge_text}\n\n{clean_plain_message}\n\nBUNKER GYM CÓRDOBA"
 
     try:
-        msg = MIMEMultipart("alternative")
+        msg = MIMEMultipart("related")
         msg["Subject"] = subject
         msg["From"] = f"{from_name} <{from_email}>"
         msg["To"] = clean_email
-        msg.attach(MIMEText(plain_content, "plain", "utf-8"))
-        msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+        msg_alt = MIMEMultipart("alternative")
+        msg_alt.attach(MIMEText(plain_content, "plain", "utf-8"))
+        msg_alt.attach(MIMEText(html_content, "html", "utf-8"))
+        msg.attach(msg_alt)
+
+        # 1. Adjuntar logo de Bunker Gym como imagen inline (CID)
+        logo_data = None
+        logo_candidates = [
+            os.path.join(os.path.dirname(__file__), "bunker.png"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "bunker.png"),
+            os.path.join(os.getcwd(), "frontend", "api", "bunker.png"),
+            os.path.join(os.getcwd(), "frontend", "public", "bunker.png"),
+            os.path.join(os.getcwd(), "backend", "bunker.png"),
+        ]
+        for candidate in logo_candidates:
+            if os.path.exists(candidate):
+                try:
+                    with open(candidate, "rb") as lf:
+                        logo_data = lf.read()
+                    if logo_data:
+                        break
+                except Exception:
+                    pass
+
+        if logo_data:
+            try:
+                img_part = MIMEImage(logo_data, name="bunker.png")
+                img_part.add_header("Content-ID", "<bunker_logo>")
+                img_part.add_header("Content-Disposition", "inline", filename="bunker.png")
+                msg.attach(img_part)
+            except Exception as e:
+                logger.warning(f"[EMAIL LOGO ATTACH ERROR]: {e}")
+
+        # 2. Adjuntar comprobante PDF si existe
+        if pdf_base64:
+            try:
+                raw_b64 = str(pdf_base64).strip()
+                if "," in raw_b64:
+                    raw_b64 = raw_b64.split(",", 1)[1]
+                pdf_bytes = base64.b64decode(raw_b64)
+                pdf_part = MIMEApplication(pdf_bytes, _subtype="pdf")
+                clean_name = re.sub(r"[^\w\s-]", "", member_name).strip().replace(" ", "_")
+                pdf_filename = f"Comprobante_Pago_{clean_name}.pdf"
+                pdf_part.add_header("Content-Disposition", "attachment", filename=pdf_filename)
+                msg.attach(pdf_part)
+                logger.info(f"[EMAIL PDF ATTACHED] Filename: {pdf_filename} ({len(pdf_bytes)} bytes)")
+            except Exception as e:
+                logger.error(f"[EMAIL PDF ATTACH ERROR]: {e}")
 
         if smtp_port == 465:
             with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=12) as server:
@@ -587,6 +862,67 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
         "email_sent": bool(email_success),
         "message": message,
         "dispatched_at": datetime.datetime.utcnow().isoformat()
+    }
+
+@router.post("/members/{member_id}/send_payment_receipt")
+def send_payment_receipt(member_id: int, payload: dict = Body(default={}), db: Session = Depends(get_db)):
+    member = db.query(models.Member).get(member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Socio no encontrado")
+
+    amount = float(payload.get("amount", 0))
+    method = (payload.get("method") or "Efectivo").strip()
+    staff_name = (payload.get("staff_name") or "Administración").strip()
+    plan = (payload.get("plan") or member.membership_type or "Cuota de Gimnasio").strip()
+    date_str = (payload.get("date") or datetime.datetime.now().strftime("%d/%m/%Y %H:%M")).strip()
+    pdf_base64 = payload.get("pdf_base64")
+
+    target_phone = (member.phone or "").strip()
+    target_email = (member.email or "").strip()
+    member_name = member.name or "Socio"
+
+    amount_fmt = f"{amount:,.0f}".replace(",", ".")
+
+    # 1. Mensaje personalizado para WhatsApp según requerimiento del usuario
+    if target_email:
+        ws_message = f"Hola soy BUNKER BOT de BUNKER GYM, como estas ? Se te envio al mail {target_email} el comprobante de pago de la cuota. ¡Muchas gracias por entrenar con nosotros!"
+    else:
+        ws_message = f"Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te informamos que tu pago de ${amount_fmt} ({plan}) ha sido registrado con exito. ¡Muchas gracias por entrenar con nosotros!"
+
+    # 2. Despachar WhatsApp en segundo plano
+    if target_phone:
+        threading.Thread(
+            target=dispatch_whatsapp_message,
+            args=(target_phone, ws_message),
+            daemon=True
+        ).start()
+
+    # 3. Despachar Correo con comprobante y PDF en segundo plano
+    if target_email:
+        email_message = f"Tu pago por <strong>${amount_fmt}</strong> correspondiente a <strong>{plan}</strong> ha sido acreditado exitosamente. Adjuntamos tu comprobante oficial en formato PDF para que lo conserves."
+        receipt_data = {
+            "amount": amount,
+            "method": method,
+            "staff_name": staff_name,
+            "plan": plan,
+            "date": date_str,
+            "has_pdf": bool(pdf_base64)
+        }
+        threading.Thread(
+            target=dispatch_email_message,
+            args=(target_email, member_name, "PAGO", email_message, pdf_base64, receipt_data),
+            daemon=True
+        ).start()
+
+    return {
+        "status": "dispatched",
+        "member_id": member.id,
+        "name": member_name,
+        "amount": amount,
+        "whatsapp_dispatched": bool(target_phone),
+        "email_dispatched": bool(target_email),
+        "target_email": target_email or None,
+        "target_phone": target_phone or None
     }
 
 @router.post("/members/{member_id}/simulate_transition")
