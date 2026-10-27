@@ -43,6 +43,9 @@ class MemberBase(BaseModel):
     routine: Optional[List[Dict]] = None
     routine_documents: Optional[List[Dict]] = []
     training_plan_id: Optional[int] = None
+    fixed_billing_day: Optional[int] = None
+    keep_billing_day: Optional[bool] = False
+    next_due_date: Optional[datetime] = None
 
 class MemberCreate(BaseModel):
     dni: str
@@ -58,6 +61,9 @@ class MemberCreate(BaseModel):
     routine: Optional[List[Dict]] = None
     routine_documents: Optional[List[Dict]] = []
     training_plan_id: Optional[int] = None
+    fixed_billing_day: Optional[int] = None
+    keep_billing_day: Optional[bool] = False
+    next_due_date: Optional[datetime] = None
 
 class MemberSchema(MemberBase):
     id: int

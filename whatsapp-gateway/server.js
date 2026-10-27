@@ -216,6 +216,19 @@ app.post('/send', authenticate, async (req, res) => {
   }
 });
 
+// Serve logo
+app.get('/bunker.png', (req, res) => {
+  const logoPath = path.join(__dirname, 'bunker.png');
+  if (fs.existsSync(logoPath)) {
+    return res.sendFile(logoPath);
+  }
+  const rootLogo = path.join(__dirname, '..', 'bunker.png');
+  if (fs.existsSync(rootLogo)) {
+    return res.sendFile(rootLogo);
+  }
+  res.status(404).end();
+});
+
 // UI: Web View with Live QR Code or Connected Status
 app.get(['/', '/qr'], (req, res) => {
   const phone = connectedUser?.id ? connectedUser.id.split(':')[0] : null;
@@ -249,6 +262,14 @@ app.get(['/', '/qr'], (req, res) => {
       padding: 36px 30px;
       text-align: center;
       box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+    }
+    .brand-logo {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      margin: 0 auto 14px auto;
+      display: block;
+      filter: drop-shadow(0 8px 20px rgba(0,0,0,0.6));
     }
     .logo {
       font-size: 20px;
@@ -338,6 +359,7 @@ app.get(['/', '/qr'], (req, res) => {
 </head>
 <body>
   <div class="card">
+    <img src="/bunker.png" alt="Bunker Gym" class="brand-logo" onerror="this.style.display='none'" />
     <div class="logo">BUNKER GYM</div>
     <div class="subtitle">Pasarela de WhatsApp 2026</div>
 

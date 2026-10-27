@@ -20,6 +20,9 @@ class Member(Base):
     membership_type = Column(String) # Basic, Premium, Elite (Plan Principal)
     additional_plans = Column(JSON, default=[]) # Planes Adicionales
     joined_at = Column(DateTime, default=datetime.datetime.utcnow)
+    fixed_billing_day = Column(Integer, nullable=True) # e.g. 23 (Día fijo de cobro)
+    keep_billing_day = Column(Boolean, default=False)  # Mantener día de cobro para siempre
+    next_due_date = Column(DateTime, nullable=True)    # Fecha del próximo cobro/vencimiento
     last_checkin = Column(DateTime, nullable=True)
     
     # Wellness metrics (JSON for flexibility in prototyping)
@@ -42,6 +45,8 @@ class Payment(Base):
     method = Column(String, default="Efectivo") # Efectivo, Tarjeta, etc
     stripe_id = Column(String, nullable=True)
     plan_details = Column(JSON, nullable=True) # Desglose de planes contratados
+    billing_date = Column(DateTime, nullable=True)
+    next_due_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     member = relationship("Member", back_populates="payments")

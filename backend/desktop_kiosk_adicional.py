@@ -26,6 +26,14 @@ def compute_status(member) -> str:
     """Calcula el estado según los días transcurridos desde joined_at. INACTIVO se respeta siempre."""
     if member.status == "INACTIVO":
         return "INACTIVO"
+    today = datetime.datetime.utcnow()
+    if getattr(member, 'next_due_date', None):
+        days_until = (member.next_due_date.date() - today.date()).days
+        if days_until < 0:
+            return "DEUDA"
+        elif days_until <= 7:
+            return "POR VENCER"
+        return "ACTIVO"
     if not member.joined_at:
         return member.status
         
@@ -35,7 +43,6 @@ def compute_status(member) -> str:
     elif 'SEMESTRAL' in plan: total_days = 180
     elif 'ANUAL' in plan: total_days = 365
     
-    today = datetime.datetime.utcnow()
     days_since = (today - member.joined_at).days
     
     if days_since >= total_days:

@@ -97,23 +97,46 @@ def get_all_members(db: Session = Depends(get_db)):
     now = datetime.datetime.utcnow()
     updated = False
     for m in members:
-        if m.status != "INACTIVO" and m.joined_at:
-            membership_type = (m.membership_type or "").upper()
-            validity_days = 30
-            if "TRIMESTRAL" in membership_type:
-                validity_days = 90
-            elif "SEMESTRAL" in membership_type:
-                validity_days = 180
-            elif "ANUAL" in membership_type:
-                validity_days = 365
+        # Sync from wellness_data if columns are None
+        wdata = m.wellness_data or {}
+        if m.keep_billing_day is None and "keep_billing_day" in wdata:
+            m.keep_billing_day = wdata["keep_billing_day"]
+        if m.fixed_billing_day is None and "fixed_billing_day" in wdata:
+            m.fixed_billing_day = wdata["fixed_billing_day"]
+        if m.next_due_date is None and "next_due_date" in wdata and wdata["next_due_date"]:
+            try:
+                m.next_due_date = datetime.datetime.fromisoformat(wdata["next_due_date"].replace("Z", ""))
+            except Exception:
+                pass
 
-            days_since = (now - m.joined_at).days
-            if days_since >= validity_days:
-                new_status = "DEUDA"
-            elif days_since >= validity_days - 7:
-                new_status = "POR VENCER"
+        if m.status != "INACTIVO":
+            if m.next_due_date:
+                days_until_due = (m.next_due_date.date() - now.date()).days
+                if days_until_due < 0:
+                    new_status = "DEUDA"
+                elif days_until_due <= 7:
+                    new_status = "POR VENCER"
+                else:
+                    new_status = "ACTIVO"
+            elif m.joined_at:
+                membership_type = (m.membership_type or "").upper()
+                validity_days = 30
+                if "TRIMESTRAL" in membership_type:
+                    validity_days = 90
+                elif "SEMESTRAL" in membership_type:
+                    validity_days = 180
+                elif "ANUAL" in membership_type:
+                    validity_days = 365
+
+                days_since = (now - m.joined_at).days
+                if days_since >= validity_days:
+                    new_status = "DEUDA"
+                elif days_since >= validity_days - 7:
+                    new_status = "POR VENCER"
+                else:
+                    new_status = "ACTIVO"
             else:
-                new_status = "ACTIVO"
+                new_status = m.status
             
             if m.status != new_status:
                 old_status = m.status
@@ -1084,12 +1107,63 @@ def update_member_status(member_id: int, status: str, db: Session = Depends(get_
     return {"status": "updated", "new_status": status}
 
 @router.post("/payments")
-def record_payment(member_id: int, amount: float = 0, method: str = "card", processed_by: str = "", db: Session = Depends(get_db)):
+def record_payment(
+    member_id: int,
+    amount: float = 0,
+    method: str = "card",
+    processed_by: str = "",
+    billing_date: str = None,
+    next_due_date: str = None,
+    keep_billing_day: bool = False,
+    fixed_billing_day: int = None,
+    db: Session = Depends(get_db)
+):
     member = db.query(models.Member).get(member_id)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
     now = datetime.datetime.utcnow()
+
+    billing_dt = now
+    if billing_date:
+        try:
+            billing_dt = datetime.datetime.fromisoformat(billing_date.replace("Z", ""))
+        except Exception:
+            billing_dt = now
+
+    next_due_dt = None
+    if next_due_date:
+        try:
+            next_due_dt = datetime.datetime.fromisoformat(next_due_date.replace("Z", ""))
+        except Exception:
+            pass
+
+    membership_type = (member.membership_type or "").upper()
+    validity_days = 30
+    if "TRIMESTRAL" in membership_type:
+        validity_days = 90
+    elif "SEMESTRAL" in membership_type:
+        validity_days = 180
+    elif "ANUAL" in membership_type:
+        validity_days = 365
+
+    if not next_due_dt:
+        if keep_billing_day and fixed_billing_day:
+            import calendar
+            y = billing_dt.year
+            m = billing_dt.month + (validity_days // 30)
+            while m > 12:
+                m -= 12
+                y += 1
+            max_d = calendar.monthrange(y, m)[1]
+            day_to_use = min(int(fixed_billing_day), max_d)
+            next_due_dt = datetime.datetime(y, m, day_to_use, 23, 59, 59)
+        else:
+            next_due_dt = billing_dt + datetime.timedelta(days=validity_days)
+
+    f_day = fixed_billing_day
+    if keep_billing_day and not f_day:
+        f_day = next_due_dt.day if next_due_dt else billing_dt.day
 
     # Calculate itemized breakdown and total amount if amount is not specified
     plan_principal = db.query(models.Plan).filter(models.Plan.name == member.membership_type, models.Plan.is_active == True).first()
@@ -1115,13 +1189,34 @@ def record_payment(member_id: int, amount: float = 0, method: str = "card", proc
         method=method,
         stripe_id=processed_by or None,
         plan_details=plan_details,
-        created_at=now
+        billing_date=billing_dt,
+        next_due_date=next_due_dt,
+        created_at=billing_dt
     )
     db.add(payment)
     member.status = "ACTIVO"
-    member.joined_at = now
+    member.joined_at = billing_dt
+    member.next_due_date = next_due_dt
+    member.keep_billing_day = bool(keep_billing_day)
+    member.fixed_billing_day = f_day
+
+    # Mirror to wellness_data
+    wdata = dict(member.wellness_data or {})
+    wdata["keep_billing_day"] = bool(keep_billing_day)
+    wdata["fixed_billing_day"] = f_day
+    wdata["next_due_date"] = next_due_dt.isoformat() if next_due_dt else None
+    member.wellness_data = wdata
+    flag_modified(member, "wellness_data")
+
     db.commit()
-    return {"status": "payment recorded", "amount": final_amount, "details": plan_details}
+    return {
+        "status": "payment recorded",
+        "amount": final_amount,
+        "details": plan_details,
+        "next_due_date": next_due_dt.isoformat() if next_due_dt else None,
+        "keep_billing_day": member.keep_billing_day,
+        "fixed_billing_day": member.fixed_billing_day
+    }
 
 @router.delete("/payments/{payment_id}")
 def delete_payment(payment_id: int, db: Session = Depends(get_db)):

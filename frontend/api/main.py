@@ -47,24 +47,35 @@ def get_member(dni: str, db: Session = Depends(get_db)):
     if not member:
         return {"error": "Member not found"}
     
-    if member.status != "INACTIVO" and member.joined_at:
+    if member.status != "INACTIVO":
         now = datetime.datetime.utcnow()
-        days_since = (now - member.joined_at).days
-        plan = (member.membership_type or "").upper()
-        total_days = 30
-        if plan == "TRIMESTRAL":
-            total_days = 90
-        elif plan == "SEMESTRAL":
-            total_days = 180
-        elif plan == "ANUAL":
-            total_days = 365
-            
-        if days_since >= total_days:
-            new_status = "DEUDA"
-        elif days_since >= total_days - 7:
-            new_status = "POR VENCER"
+        if member.next_due_date:
+            days_until_due = (member.next_due_date.date() - now.date()).days
+            if days_until_due < 0:
+                new_status = "DEUDA"
+            elif days_until_due <= 7:
+                new_status = "POR VENCER"
+            else:
+                new_status = "ACTIVO"
+        elif member.joined_at:
+            days_since = (now - member.joined_at).days
+            plan = (member.membership_type or "").upper()
+            total_days = 30
+            if plan == "TRIMESTRAL":
+                total_days = 90
+            elif plan == "SEMESTRAL":
+                total_days = 180
+            elif plan == "ANUAL":
+                total_days = 365
+                
+            if days_since >= total_days:
+                new_status = "DEUDA"
+            elif days_since >= total_days - 7:
+                new_status = "POR VENCER"
+            else:
+                new_status = "ACTIVO"
         else:
-            new_status = "ACTIVO"
+            new_status = member.status
         
         if member.status != new_status:
             member.status = new_status
