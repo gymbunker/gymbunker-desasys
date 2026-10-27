@@ -280,8 +280,8 @@ def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str
         return False
 
     sender = sender_phone or os.getenv("VITE_WHATSAPP_PHONE") or os.getenv("WHATSAPP_PHONE") or ""
-    gateway_url = os.getenv("WHATSAPP_GATEWAY_URL")
-    gateway_token = os.getenv("WHATSAPP_API_TOKEN")
+    gateway_url = os.getenv("WHATSAPP_GATEWAY_URL") or "https://caramel-gopher-ounce.ngrok-free.dev/send"
+    gateway_token = os.getenv("WHATSAPP_API_TOKEN") or "bunker_wa_secret_2026"
     meta_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
     meta_token = os.getenv("WHATSAPP_META_TOKEN") or os.getenv("WHATSAPP_API_TOKEN")
 
@@ -376,240 +376,99 @@ def build_bunker_payment_receipt_email_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comprobante de Pago - BUNKER GYM</title>
-  <style>
-    body {{
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #070a0f;
-      margin: 0;
-      padding: 30px 15px;
-      color: #f8fafc;
-      -webkit-font-smoothing: antialiased;
-    }}
-    .wrapper {{
-      max-width: 560px;
-      margin: 0 auto;
-      background: #0f141f;
-      border-radius: 28px;
-      border: 1px solid rgba(249, 115, 22, 0.35);
-      overflow: hidden;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.7), 0 0 40px rgba(249,115,22,0.15);
-    }}
-    .header {{
-      background: linear-gradient(180deg, #182030 0%, #0f141f 100%);
-      padding: 36px 24px 22px 24px;
-      text-align: center;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }}
-    .logo-img {{
-      height: 70px;
-      max-height: 70px;
-      width: auto;
-      display: block;
-      margin: 0 auto;
-      filter: drop-shadow(0 4px 12px rgba(249,115,22,0.45));
-    }}
-    .brand-title {{
-      margin: 14px 0 2px 0;
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #ff7700;
-      text-transform: uppercase;
-    }}
-    .brand-subtitle {{
-      margin: 0;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: #94a3b8;
-      text-transform: uppercase;
-    }}
-    .accent-bar {{
-      height: 3px;
-      width: 120px;
-      margin: 16px auto 0 auto;
-      background: linear-gradient(90deg, rgba(249,115,22,0) 0%, #f97316 50%, rgba(249,115,22,0) 100%);
-      border-radius: 999px;
-    }}
-    .content {{
-      padding: 30px 26px;
-    }}
-    .receipt-badge {{
-      display: inline-block;
-      padding: 7px 20px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      background: rgba(16, 185, 129, 0.12);
-      color: #10b981;
-      border: 1px solid rgba(16, 185, 129, 0.45);
-      margin-bottom: 22px;
-    }}
-    .amount-card {{
-      background: linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(20,26,38,0.95) 100%);
-      border: 1px solid rgba(249,115,22,0.38);
-      border-radius: 22px;
-      padding: 26px 20px;
-      text-align: center;
-      margin-bottom: 24px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    }}
-    .amount-label {{
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 2.5px;
-      color: #94a3b8;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }}
-    .amount-val {{
-      font-size: 46px;
-      font-weight: 900;
-      color: #ff7700;
-      line-height: 1;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }}
-    .plan-tag {{
-      display: inline-block;
-      font-size: 14px;
-      font-weight: 800;
-      color: #f1f5f9;
-      background: rgba(255,255,255,0.06);
-      padding: 5px 16px;
-      border-radius: 999px;
-      letter-spacing: 0.5px;
-    }}
-    .details-table {{
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      background: #141b27;
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 18px;
-      overflow: hidden;
-      margin-bottom: 22px;
-      font-size: 13px;
-    }}
-    .details-table td {{
-      padding: 13px 18px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }}
-    .details-table tr:last-child td {{
-      border-bottom: none;
-    }}
-    .td-label {{
-      color: #94a3b8;
-      font-weight: 600;
-      width: 40%;
-    }}
-    .td-val {{
-      color: #ffffff;
-      font-weight: 800;
-      text-align: right;
-    }}
-    .pdf-alert {{
-      background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(15,23,42,0.6) 100%);
-      border: 1px dashed rgba(16, 185, 129, 0.45);
-      border-radius: 16px;
-      padding: 16px 20px;
-      text-align: center;
-      font-size: 13px;
-      color: #a7f3d0;
-      line-height: 1.5;
-      margin-bottom: 24px;
-    }}
-    .footer {{
-      background: #090d14;
-      padding: 26px 20px;
-      text-align: center;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }}
-    .footer-brand {{
-      margin: 0 0 6px 0;
-      font-size: 12px;
-      font-weight: 800;
-      color: #e2e8f0;
-      letter-spacing: 1.5px;
-    }}
-    .footer-text {{
-      margin: 0;
-      font-size: 11px;
-      color: #64748b;
-      line-height: 1.6;
-    }}
-  </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <img src="cid:bunker_logo" alt="BUNKER GYM" class="logo-img" onerror="this.src='https://gymbunker.vercel.app/bunker.png'" />
-      <div class="brand-title">BUNKER GYM</div>
-      <div class="brand-subtitle">COMPROBANTE OFICIAL DE PAGO</div>
-      <div class="accent-bar"></div>
-    </div>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #070a0f; margin: 0; padding: 25px 15px; color: #f8fafc; -webkit-font-smoothing: antialiased;">
+  <!-- CONTENEDOR HORIZONTAL APAISADO (720px) -->
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 720px; margin: 0 auto; background: #0f141f; border-radius: 24px; border: 1px solid rgba(249, 115, 22, 0.35); box-shadow: 0 20px 50px rgba(0,0,0,0.7), 0 0 35px rgba(249,115,22,0.15); overflow: hidden;">
+    
+    <!-- HEADER HORIZONTAL: LOGO Y DATOS A LA IZQUIERDA, ESTADO Y FECHA A LA DERECHA -->
+    <tr>
+      <td style="background: linear-gradient(90deg, #182233 0%, #101622 100%); padding: 24px 30px; border-bottom: 1px solid rgba(255,255,255,0.07);">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="middle" style="width: 70px;">
+              <img src="cid:bunker_logo" alt="BUNKER GYM" style="height: 58px; max-height: 58px; width: auto; display: block; filter: drop-shadow(0 3px 8px rgba(249,115,22,0.4));" onerror="this.src='https://gymbunker.vercel.app/bunker.png'" />
+            </td>
+            <td valign="middle" style="padding-left: 18px;">
+              <div style="font-size: 22px; font-weight: 900; letter-spacing: 3px; color: #ff7700; text-transform: uppercase; line-height: 1.1;">BUNKER GYM</div>
+              <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #94a3b8; text-transform: uppercase; margin-top: 4px;">COMPROBANTE OFICIAL DE PAGO</div>
+            </td>
+            <td valign="middle" align="right">
+              <span style="display: inline-block; padding: 6px 16px; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.45);">&#10004; PAGO ACREDITADO</span>
+              <div style="font-size: 11px; color: #64748b; margin-top: 6px; font-weight: 600;">{date_desc}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
 
-    <div class="content">
-      <div style="text-align: center;">
-        <span class="receipt-badge">&#10004; PAGO ACREDITADO CON &Eacute;XITO</span>
-      </div>
+    <!-- CUERPO HORIZONTAL: DOS COLUMNAS (TARJETA DE MONTO IZQ + DETALLES DER) -->
+    <tr>
+      <td style="padding: 28px 30px 20px 30px;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <!-- COLUMNA IZQUIERDA: MONTO Y PLAN -->
+            <td valign="top" style="width: 44%; padding-right: 15px;">
+              <div style="background: linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(20,26,38,0.95) 100%); border: 1px solid rgba(249,115,22,0.38); border-radius: 18px; padding: 24px 18px; text-align: center; height: 100%; box-sizing: border-box;">
+                <div style="font-size: 10px; font-weight: 900; letter-spacing: 2px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">Monto Total Abonado</div>
+                <div style="font-size: 42px; font-weight: 900; color: #ff7700; line-height: 1; letter-spacing: 0.5px; margin-bottom: 12px;">${amount_fmt}</div>
+                <div style="display: inline-block; font-size: 13px; font-weight: 800; color: #f1f5f9; background: rgba(255,255,255,0.08); padding: 5px 14px; border-radius: 999px;">{plan_desc}</div>
+                <div style="margin-top: 18px; font-size: 11px; color: #10b981; font-weight: 800;">ESTADO: ACREDITADO</div>
+              </div>
+            </td>
 
-      <div class="amount-card">
-        <div class="amount-label">Monto Total Abonado</div>
-        <div class="amount-val">${amount_fmt}</div>
-        <div class="plan-tag">{plan_desc}</div>
-      </div>
+            <!-- COLUMNA DERECHA: TABLA HORIZONTAL DE DATOS -->
+            <td valign="top" style="width: 56%; padding-left: 15px;">
+              <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background: #141b27; border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; overflow: hidden; font-size: 13px;">
+                <tr>
+                  <td style="padding: 11px 16px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05);">Titular / Socio:</td>
+                  <td style="padding: 11px 16px; color: #ffffff; font-weight: 800; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.05);">{member_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 11px 16px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05);">DNI:</td>
+                  <td style="padding: 11px 16px; color: #ffffff; font-weight: 800; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.05);">{dni_desc}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 11px 16px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05);">Medio de Pago:</td>
+                  <td style="padding: 11px 16px; color: #ffffff; font-weight: 800; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.05);">{method_desc}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 11px 16px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05);">Fecha y Hora:</td>
+                  <td style="padding: 11px 16px; color: #ffffff; font-weight: 800; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.05);">{date_desc}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 11px 16px; color: #94a3b8; font-weight: 600;">Atendido por:</td>
+                  <td style="padding: 11px 16px; color: #ffffff; font-weight: 800; text-align: right;">{staff_desc}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
 
-      <table class="details-table">
-        <tr>
-          <td class="td-label">Titular / Socio:</td>
-          <td class="td-val">{member_name}</td>
-        </tr>
-        <tr>
-          <td class="td-label">DNI:</td>
-          <td class="td-val">{dni_desc}</td>
-        </tr>
-        <tr>
-          <td class="td-label">Medio de Pago:</td>
-          <td class="td-val">{method_desc}</td>
-        </tr>
-        <tr>
-          <td class="td-label">Fecha y Hora:</td>
-          <td class="td-val">{date_desc}</td>
-        </tr>
-        <tr>
-          <td class="td-label">Atendido por:</td>
-          <td class="td-val">{staff_desc}</td>
-        </tr>
-        <tr>
-          <td class="td-label">Estado:</td>
-          <td class="td-val" style="color: #10b981;">ACREDITADO</td>
-        </tr>
-      </table>
+        <!-- BANNER HORIZONTAL DE PDF ADJUNTO -->
+        <div style="background: linear-gradient(90deg, rgba(16,185,129,0.12) 0%, rgba(15,23,42,0.65) 100%); border: 1px dashed rgba(16, 185, 129, 0.45); border-radius: 14px; padding: 14px 20px; margin-top: 22px; font-size: 13px; color: #a7f3d0; text-align: center;">
+          &#128206; <strong>Comprobante Oficial Adjunto en PDF:</strong> Descarg&aacute; el archivo adjunto a este correo para conservar tu constancia oficial de pago con sello institucional.
+        </div>
+      </td>
+    </tr>
 
-      <div class="pdf-alert">
-        &#128206; <strong>Comprobante Oficial Adjunto (PDF):</strong><br />
-        Descarg&aacute; el archivo PDF adjunto a este correo para conservar tu constancia oficial de pago con sello institucional.
-      </div>
-
-      <p style="text-align: center; font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
-        &iexcl;Muchas gracias por entrenar con nosotros y ser parte de <strong>BUNKER GYM</strong>!
-      </p>
-    </div>
-
-    <div class="footer">
-      <div class="footer-brand">BUNKER GYM C&Oacute;RDOBA</div>
-      <p class="footer-text">
-        Este comprobante digital es v&aacute;lido como constancia oficial de pago emitida para <strong>{member_name}</strong>.<br />
-        Sede C&oacute;rdoba &bull; Horarios: Lun a Vie 07:00 a 23:00 hs &bull; S&aacute;b 09:00 a 14:00 hs
-      </p>
-      <p style="margin: 12px 0 0 0; font-size: 10px; color: #475569; letter-spacing: 1px;">
-        &copy; 2026 BUNKER GYM &bull; TODOS LOS DERECHOS RESERVADOS
-      </p>
-    </div>
-  </div>
+    <!-- FOOTER HORIZONTAL -->
+    <tr>
+      <td style="background: #090d14; padding: 20px 30px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="middle">
+              <div style="font-size: 12px; font-weight: 800; color: #e2e8f0; letter-spacing: 1px;">BUNKER GYM C&Oacute;RDOBA</div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 3px;">Lun a Vie 07:00 a 23:00 hs &bull; S&aacute;b 09:00 a 14:00 hs</div>
+            </td>
+            <td valign="middle" align="right">
+              <div style="font-size: 10px; color: #475569; letter-spacing: 1px;">&copy; 2026 BUNKER GYM &bull; TODOS LOS DERECHOS RESERVADOS</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>"""
 
@@ -628,183 +487,73 @@ def build_bunker_notification_email_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aviso - BUNKER GYM</title>
-  <style>
-    body {{
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #070a0f;
-      margin: 0;
-      padding: 30px 15px;
-      color: #f8fafc;
-      -webkit-font-smoothing: antialiased;
-    }}
-    .wrapper {{
-      max-width: 540px;
-      margin: 0 auto;
-      background: #0f141f;
-      border-radius: 28px;
-      border: 1px solid rgba(249, 115, 22, 0.3);
-      overflow: hidden;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.7), 0 0 35px rgba(249,115,22,0.12);
-    }}
-    .header {{
-      background: linear-gradient(180deg, #182030 0%, #0f141f 100%);
-      padding: 36px 24px 22px 24px;
-      text-align: center;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }}
-    .logo-img {{
-      height: 70px;
-      max-height: 70px;
-      width: auto;
-      display: block;
-      margin: 0 auto;
-      filter: drop-shadow(0 4px 12px rgba(249,115,22,0.45));
-    }}
-    .brand-title {{
-      margin: 14px 0 2px 0;
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #ff7700;
-      text-transform: uppercase;
-    }}
-    .brand-subtitle {{
-      margin: 0;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: #94a3b8;
-      text-transform: uppercase;
-    }}
-    .accent-bar {{
-      height: 3px;
-      width: 120px;
-      margin: 16px auto 0 auto;
-      background: linear-gradient(90deg, rgba(249,115,22,0) 0%, #f97316 50%, rgba(249,115,22,0) 100%);
-      border-radius: 999px;
-    }}
-    .content {{
-      padding: 32px 26px 24px 26px;
-      text-align: center;
-    }}
-    .status-badge {{
-      display: inline-block;
-      padding: 7px 22px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      background: {color_badge}1a;
-      color: {color_badge};
-      border: 1px solid {color_badge}66;
-      margin-bottom: 22px;
-    }}
-    .greeting {{
-      font-size: 22px;
-      font-weight: 900;
-      color: #ffffff;
-      margin-bottom: 16px;
-      letter-spacing: 0.3px;
-    }}
-    .message-card {{
-      background: linear-gradient(180deg, #151c28 0%, #101622 100%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 24px 22px;
-      margin: 0 0 22px 0;
-      color: #f1f5f9;
-      font-size: 15px;
-      line-height: 1.65;
-      text-align: center;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    }}
-    .bot-chip {{
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #ff7700;
-      background: rgba(249,115,22,0.12);
-      border: 1px solid rgba(249,115,22,0.3);
-      padding: 4px 14px;
-      border-radius: 999px;
-      margin-bottom: 14px;
-    }}
-    .info-card {{
-      background: #111622;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.05);
-      padding: 16px 20px;
-      margin-top: 10px;
-      font-size: 12px;
-      color: #94a3b8;
-      line-height: 1.6;
-      text-align: center;
-    }}
-    .footer {{
-      background: #090d14;
-      padding: 26px 20px;
-      text-align: center;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }}
-    .footer-brand {{
-      margin: 0 0 6px 0;
-      font-size: 12px;
-      font-weight: 800;
-      color: #e2e8f0;
-      letter-spacing: 1.5px;
-    }}
-    .footer-text {{
-      margin: 0;
-      font-size: 11px;
-      color: #64748b;
-      line-height: 1.6;
-    }}
-  </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <img src="cid:bunker_logo" alt="BUNKER GYM" class="logo-img" onerror="this.src='https://gymbunker.vercel.app/bunker.png'" />
-      <div class="brand-title">BUNKER GYM</div>
-      <div class="brand-subtitle">CENTRO DE ENTRENAMIENTO &bull; C&Oacute;RDOBA</div>
-      <div class="accent-bar"></div>
-    </div>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #070a0f; margin: 0; padding: 25px 15px; color: #f8fafc; -webkit-font-smoothing: antialiased;">
+  <!-- CONTENEDOR HORIZONTAL APAISADO (700px) -->
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 700px; margin: 0 auto; background: #0f141f; border-radius: 24px; border: 1px solid rgba(249, 115, 22, 0.3); box-shadow: 0 20px 50px rgba(0,0,0,0.7), 0 0 35px rgba(249,115,22,0.15); overflow: hidden;">
+    
+    <!-- HEADER HORIZONTAL CON LOGO, TITULO Y BADGE EN LA MISMA LINEA -->
+    <tr>
+      <td style="background: linear-gradient(90deg, #182233 0%, #101622 100%); padding: 22px 28px; border-bottom: 1px solid rgba(255,255,255,0.07);">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="middle" style="width: 60px;">
+              <img src="cid:bunker_logo" alt="BUNKER GYM" style="height: 52px; max-height: 52px; width: auto; display: block; filter: drop-shadow(0 3px 8px rgba(249,115,22,0.4));" onerror="this.src='https://gymbunker.vercel.app/bunker.png'" />
+            </td>
+            <td valign="middle" style="padding-left: 16px;">
+              <div style="font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #ff7700; text-transform: uppercase;">BUNKER GYM</div>
+              <div style="font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: #94a3b8; text-transform: uppercase; margin-top: 3px;">CENTRO DE ENTRENAMIENTO &bull; C&Oacute;RDOBA</div>
+            </td>
+            <td valign="middle" align="right">
+              <span style="display: inline-block; padding: 6px 18px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; background: {color_badge}1a; color: {color_badge}; border: 1px solid {color_badge}66;">&bull; {badge_text}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
 
-    <div class="content">
-      <div>
-        <span class="status-badge">&bull; {badge_text}</span>
-      </div>
+    <!-- CONTENIDO HORIZONTAL: DOS COLUMNAS O CARD HORIZONTAL ANCHA -->
+    <tr>
+      <td style="padding: 26px 28px;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="top" style="width: 32%; padding-right: 18px; border-right: 1px solid rgba(255,255,255,0.06);">
+              <div style="font-size: 18px; font-weight: 900; color: #ffffff; margin-bottom: 8px;">&iexcl;Hola, {member_name}! &#128075;</div>
+              <div style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 14px;">
+                Te contactamos autom&aacute;ticamente desde la administraci&oacute;n de Bunker Gym.
+              </div>
+              <div style="background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3); border-radius: 12px; padding: 10px 14px; font-size: 11px; color: #ff7700; font-weight: 800; text-align: center;">
+                &#129302; BUNKER BOT
+              </div>
+            </td>
 
-      <div class="greeting">&iexcl;Hola, {member_name}! &#128075;</div>
+            <td valign="top" style="width: 68%; padding-left: 20px;">
+              <div style="background: linear-gradient(135deg, #151c28 0%, #101622 100%); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px 22px; color: #f8fafc; font-size: 15px; line-height: 1.65; box-shadow: 0 8px 20px rgba(0,0,0,0.25);">
+                {clean_message}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
 
-      <div class="message-card">
-        <div class="bot-chip">&#129302; MENSAJE DE BUNKER BOT</div>
-        <div style="color: #f8fafc; font-size: 15px;">
-          {clean_message}
-        </div>
-      </div>
-
-      <div class="info-card">
-        <strong style="color: #ffffff;">Sede:</strong> Bunker Gym C&oacute;rdoba &bull; 
-        <strong style="color: #ffffff;">Horarios:</strong> Lun a Vie 07:00 a 23:00 hs | S&aacute;b 09:00 a 14:00 hs<br />
-        <span style="color: #f97316;">&#128170; &iexcl;Pasi&oacute;n y compromiso por el entrenamiento!</span>
-      </div>
-    </div>
-
-    <div class="footer">
-      <div class="footer-brand">BUNKER GYM C&Oacute;RDOBA</div>
-      <p class="footer-text">
-        Este es un mensaje institucional autom&aacute;tico emitido para <strong>{member_name}</strong>.<br />
-        Por favor no responder a este correo.
-      </p>
-      <p style="margin: 12px 0 0 0; font-size: 10px; color: #475569; letter-spacing: 1px;">
-        &copy; 2026 BUNKER GYM &bull; TODOS LOS DERECHOS RESERVADOS
-      </p>
-    </div>
-  </div>
+    <!-- FOOTER HORIZONTAL CON HORARIOS Y SEDE -->
+    <tr>
+      <td style="background: #090d14; padding: 18px 28px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="middle">
+              <div style="font-size: 12px; font-weight: 800; color: #e2e8f0; letter-spacing: 1px;">BUNKER GYM C&Oacute;RDOBA</div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Lun a Vie 07:00 a 23:00 hs &bull; S&aacute;b 09:00 a 14:00 hs</div>
+            </td>
+            <td valign="middle" align="right">
+              <div style="font-size: 10px; color: #475569;">&copy; 2026 BUNKER GYM &bull; TODOS LOS DERECHOS RESERVADOS</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>"""
 
