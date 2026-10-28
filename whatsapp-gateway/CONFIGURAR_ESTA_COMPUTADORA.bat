@@ -42,7 +42,7 @@ call npm install
 echo.
 :node_modules_ok
 
-:: 3. Configurar Authtoken de Ngrok directamente (sin preguntas)
+:: 3. Configurar Authtoken de Ngrok directamente
 echo ==============================================================
 echo Configurando Ngrok y Credenciales del Bunker Gym...
 echo ==============================================================
@@ -65,12 +65,14 @@ echo [OK] Archivo .env configurado con el dominio caramel-gopher-ounce.ngrok-fre
 :: 5. Instalar arranque invisible en Inicio de Windows
 echo.
 echo [INFO] Instalando arranque automatico con Windows...
-set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "DEST_VBS=%STARTUP_FOLDER%\BunkerWhatsAppBot.vbs"
 
-echo Set WshShell = CreateObject("WScript.Shell")> "%DEST_VBS%"
-echo WshShell.CurrentDirectory = "%~dp0">> "%DEST_VBS%"
-echo WshShell.Run "node run.js", 0, False>> "%DEST_VBS%"
+:: Generar start_silent.vbs dinamico con la ruta de ESTA computadora
+echo Set WshShell = CreateObject("WScript.Shell")> "%~dp0start_silent.vbs"
+echo WshShell.CurrentDirectory = "%~dp0">> "%~dp0start_silent.vbs"
+echo WshShell.Run "node run.js", 0, False>> "%~dp0start_silent.vbs"
+
+set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+copy /Y "%~dp0start_silent.vbs" "%STARTUP_FOLDER%\BunkerWhatsAppBot.vbs" >nul
 
 echo [OK] Inicio automatico invisible instalado en Windows.
 echo.
@@ -82,8 +84,14 @@ echo   La pasarela se iniciara ahora en segundo plano.
 echo   Se abrira el navegador con el codigo QR para escanear.
 echo ==============================================================
 echo.
+
+:: Cerrar procesos previos en el puerto 3001 si habia alguno
+taskkill /F /IM ngrok.exe /T 2>nul
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3001') do taskkill /F /PID %%a 2>nul
+timeout /t 1 >nul
+
 wscript "%~dp0start_silent.vbs"
-timeout /t 3 >nul
+timeout /t 4 >nul
 
 echo Abriendo panel de WhatsApp en el navegador...
 start http://localhost:3001
