@@ -3,7 +3,7 @@ title Instalador Bunker Gym WhatsApp Gateway
 color 0A
 cd /d "%~dp0"
 
-:: Asegurar que Node.js este en el PATH incluso recien instalado
+:: Asegurar que Node.js este en el PATH incluso recien instalado sin reiniciar
 if exist "C:\Program Files\nodejs" set "PATH=%PATH%;C:\Program Files\nodejs"
 if exist "C:\Program Files (x86)\nodejs" set "PATH=%PATH%;C:\Program Files (x86)\nodejs"
 if exist "%APPDATA%\npm" set "PATH=%PATH%;%APPDATA%\npm"
@@ -42,13 +42,11 @@ call npm install
 echo.
 :node_modules_ok
 
-:: 3. Configurar Authtoken de Ngrok
+:: 3. Configurar Authtoken de Ngrok directamente (sin preguntas)
 echo ==============================================================
-echo Configuracion de Ngrok - Dominio permanente
+echo Configurando Ngrok y Credenciales del Bunker Gym...
 echo ==============================================================
 set "NGROK_TOKEN=3L2II5liPkUz9dUV1U9SLjX32cF_3t7hqpWDrgBepTkqSP5Ru"
-set /p USER_TOKEN="Pega tu token de Ngrok o presiona ENTER para usar el de Bunker Gym: "
-if not "%USER_TOKEN%"=="" set "NGROK_TOKEN=%USER_TOKEN%"
 
 if not exist "ngrok.exe" goto no_ngrok
 ngrok.exe config add-authtoken %NGROK_TOKEN%
@@ -58,13 +56,11 @@ goto ngrok_done
 echo [AVISO] ngrok.exe no se encontro en esta carpeta.
 :ngrok_done
 
-:: 4. Configurar .env con el dominio
-if exist ".env" goto env_ok
+:: 4. Configurar .env con el dominio y credenciales oficiales
 echo NGROK_DOMAIN=caramel-gopher-ounce.ngrok-free.dev> .env
 echo WHATSAPP_API_TOKEN=bunker_wa_secret_2026>> .env
 echo PORT=3001>> .env
 echo [OK] Archivo .env configurado con el dominio caramel-gopher-ounce.ngrok-free.dev
-:env_ok
 
 :: 5. Instalar arranque invisible en Inicio de Windows
 echo.
@@ -89,9 +85,12 @@ echo.
 wscript "%~dp0start_silent.vbs"
 timeout /t 3 >nul
 
-echo Abriendo panel de WhatsApp...
+echo Abriendo panel de WhatsApp en el navegador...
 start http://localhost:3001
 
 echo.
-echo Todo listo. Podes cerrar esta ventana cuando quieras.
+echo ==============================================================
+echo ¡TODO LISTO! Escanea el codigo QR que se abrio en tu navegador.
+echo Podes cerrar esta ventana cuando quieras.
+echo ==============================================================
 pause
