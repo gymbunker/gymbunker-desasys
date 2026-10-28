@@ -18,8 +18,9 @@ const AUTH_DIR = path.join(__dirname, 'auth_info');
 const API_TOKEN = process.env.WHATSAPP_API_TOKEN || 'bunker_wa_secret_2026';
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 
 let sock = null;
 let isConnected = false;

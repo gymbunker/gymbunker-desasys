@@ -1786,7 +1786,7 @@ export default function AdminDashboard() {
   };
 
   const generatePaymentPDF = async (member: any, amount: number, method: string, staffName: string, customDate?: string, nextDueDate?: string): Promise<string> => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ compress: true });
 
     const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
@@ -1800,7 +1800,7 @@ export default function AdminDashboard() {
       const gState = new (doc as any).GState({opacity: 0.08});
       doc.setGState(gState);
       // Dibujar marca de agua centrada
-      doc.addImage(bgImg, 'PNG', 45, 80, 120, 120);
+      doc.addImage(bgImg, 'PNG', 45, 80, 120, 120, undefined, 'FAST');
       // Restaurar opacidad
       doc.setGState(new (doc as any).GState({opacity: 1.0}));
     } catch (e) {
@@ -1863,7 +1863,7 @@ export default function AdminDashboard() {
 
     try {
       const logo = await loadImage('/bunker.png');
-      doc.addImage(logo, 'PNG', 85, finalY + 35, 40, 40);
+      doc.addImage(logo, 'PNG', 85, finalY + 35, 40, 40, undefined, 'FAST');
     } catch (e) {
       console.warn('No se pudo cargar el logo final', e);
     }
