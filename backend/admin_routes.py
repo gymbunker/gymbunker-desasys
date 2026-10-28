@@ -295,7 +295,7 @@ def get_whatsapp_status_message(status: str) -> str:
         return "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
     return "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
 
-def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str = None) -> bool:
+def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str = None, pdf_base64: str = None, filename: str = None) -> bool:
     logger = logging.getLogger("whatsapp_sender")
     clean_digits = re.sub(r"\D", "", target_phone or "")
     if clean_digits.startswith("0"):
@@ -342,12 +342,17 @@ def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str
                 }).encode("utf-8")
                 headers = {"Content-Type": "application/x-www-form-urlencoded"}
             else:
-                post_data = json.dumps({
+                body_dict = {
                     "sender": sender,
                     "phone": clean_digits,
                     "to": clean_digits,
                     "message": message
-                }).encode("utf-8")
+                }
+                if pdf_base64:
+                    body_dict["pdf_base64"] = pdf_base64
+                    body_dict["filename"] = filename or "Comprobante_Pago_BunkerGym.pdf"
+
+                post_data = json.dumps(body_dict).encode("utf-8")
                 headers = {
                     "Content-Type": "application/json",
                     "User-Agent": "BunkerGym-WhatsApp-Client/1.0",
@@ -357,8 +362,8 @@ def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str
                     headers["Authorization"] = f"Bearer {gateway_token}"
 
             req = urllib.request.Request(gateway_url, data=post_data, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                logger.info(f"[WHATSAPP SENT via Gateway {resp.status}] To: {clean_digits}")
+            with urllib.request.urlopen(req, timeout=14) as resp:
+                logger.info(f"[WHATSAPP SENT via Gateway {resp.status}] To: {clean_digits} (PDF: {bool(pdf_base64)})")
                 return True
         else:
             logger.warning("[WHATSAPP] Ni Meta API ni WHATSAPP_GATEWAY_URL configurados.")
@@ -783,9 +788,19 @@ def notify_member_status_change(member: models.Member, old_status: str, new_stat
 
     wellness = dict(member.wellness_data or {})
     last_notified = wellness.get("last_wa_notified_status")
+    last_notified_at_str = wellness.get("last_wa_notified_at")
 
     if not force and last_notified == st:
         return False
+
+    # Anti-duplicados: Cooldown de 30 segundos para evitar envíos concurrentes o dobles
+    if last_notified_at_str and last_notified == st:
+        try:
+            last_dt = datetime.datetime.fromisoformat(last_notified_at_str)
+            if (datetime.datetime.utcnow() - last_dt).total_seconds() < 30:
+                return False
+        except Exception:
+            pass
 
     if not force and st in ["ACTIVO", "AL DIA", "AL DÍA"] and old_status not in ["DEUDA", "POR VENCER"]:
         return False
@@ -905,7 +920,12 @@ def send_member_whatsapp(member_id: int, payload: dict = Body(default={}), db: S
             )
         raise HTTPException(status_code=502, detail="Error al enviar notificación por WhatsApp o Correo.")
 
-    notify_member_status_change(member, member.status, status, db, force=True)
+    # Guardar en wellness_data para registrar que fue notificado (SIN re-disparar notificación duplicate)
+    wellness = dict(member.wellness_data or {})
+    wellness["last_wa_notified_status"] = status
+    wellness["last_wa_notified_at"] = datetime.datetime.utcnow().isoformat()
+    member.wellness_data = wellness
+    flag_modified(member, "wellness_data")
     db.commit()
 
     return {
@@ -942,18 +962,26 @@ def send_payment_receipt(member_id: int, payload: dict = Body(default={}), db: S
     member_dni = member.dni or ""
 
     amount_fmt = f"{amount:,.0f}".replace(",", ".")
+    clean_digits = re.sub(r"\D", "", target_phone)
+    receipt_filename = f"Comprobante_BunkerGym_{clean_digits or member_dni or member_id}.pdf"
 
-    # 1. Mensaje de WhatsApp según requerimiento del usuario
-    if target_email:
-        ws_message = f"Hola soy BUNKER BOT de BUNKER GYM, como estas ? Se te envio al mail {target_email} el comprobante de pago de la cuota. ¡Muchas gracias por entrenar con nosotros!"
-    else:
-        ws_message = f"Hola soy BUNKER BOT de BUNKER GYM, como estas ? Tu pago de ${amount_fmt} ({plan}) ha sido registrado con exito. ¡Muchas gracias por entrenar con nosotros!"
+    # Mensaje de WhatsApp institucional adjuntando comprobante oficial
+    ws_message = (
+        f"Hola soy BUNKER BOT de BUNKER GYM, como estas ? "
+        f"Te adjuntamos tu comprobante oficial de pago por ${amount_fmt} (Plan: {plan}). "
+        f"¡Muchas gracias por entrenar con nosotros! 💪🏋️"
+    )
 
-    # 2. Despachar WhatsApp
+    # 1. Despachar WhatsApp con el comprobante PDF adjunto
     ws_success = False
     if target_phone:
         try:
-            ws_success = dispatch_whatsapp_message(target_phone, ws_message)
+            ws_success = dispatch_whatsapp_message(
+                target_phone=target_phone,
+                message=ws_message,
+                pdf_base64=pdf_base64,
+                filename=receipt_filename
+            )
         except Exception as e:
             logging.getLogger("whatsapp_sender").error(f"[RECEIPT WHATSAPP ERROR]: {e}")
 

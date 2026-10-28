@@ -122,6 +122,27 @@ function authenticate(req, res, next) {
   next();
 }
 
+// Cache in-memory para evitar mensajes duplicados (debounce de 8 segundos)
+const recentDispatches = new Map();
+
+function isDuplicate(key) {
+  const now = Date.now();
+  if (recentDispatches.has(key)) {
+    const lastTime = recentDispatches.get(key);
+    if (now - lastTime < 8000) {
+      return true;
+    }
+  }
+  recentDispatches.set(key, now);
+  // Limpieza periódica de memoria
+  if (recentDispatches.size > 300) {
+    for (const [k, t] of recentDispatches.entries()) {
+      if (now - t > 30000) recentDispatches.delete(k);
+    }
+  }
+  return false;
+}
+
 // -------------------- HTTP ENDPOINTS --------------------
 
 // Status JSON
@@ -139,12 +160,14 @@ app.post('/send', authenticate, async (req, res) => {
   try {
     const rawTo = req.body.to || req.body.phone || req.body.recipient;
     const message = req.body.message || req.body.body || req.body.text;
+    const pdfBase64 = req.body.pdf_base64 || req.body.document || req.body.file;
+    const fileName = req.body.filename || req.body.fileName || 'Comprobante_Pago_BunkerGym.pdf';
 
     if (!rawTo) {
       return res.status(400).json({ error: 'Campo "to" o "phone" es obligatorio.' });
     }
-    if (!message) {
-      return res.status(400).json({ error: 'Campo "message" o "body" es obligatorio.' });
+    if (!message && !pdfBase64) {
+      return res.status(400).json({ error: 'Campo "message" o "pdf_base64" es obligatorio.' });
     }
 
     if (!isConnected || !sock) {
@@ -162,6 +185,18 @@ app.post('/send', authenticate, async (req, res) => {
       cleanPhone = '549' + cleanPhone.slice(2);
     } else if (cleanPhone.startsWith('351') && cleanPhone.length === 10) {
       cleanPhone = '549' + cleanPhone;
+    }
+
+    // Anti-duplicados: verificar si se envió el mismo mensaje a este número hace menos de 8 segundos
+    const dedupeKey = `${cleanPhone}:${String(message || '').trim()}:${pdfBase64 ? 'pdf' : 'txt'}`;
+    if (isDuplicate(dedupeKey)) {
+      console.log(`[WHATSAPP DEBOUNCE] Mensaje duplicado omitido para ${cleanPhone} (evitado envío doble).`);
+      return res.json({
+        success: true,
+        status: 'debounced',
+        to: cleanPhone,
+        message: 'Mensaje duplicado evitado exitosamente'
+      });
     }
 
     // Resolve canonical JID with WhatsApp server to prevent "Esperando el mensaje"
@@ -187,8 +222,26 @@ app.post('/send', authenticate, async (req, res) => {
       console.warn('[WHATSAPP] onWhatsApp verification skipped:', checkErr.message);
     }
 
-    console.log(`[WHATSAPP DISPATCH] Enviando a JID: ${targetJid}...`);
-    const sent = await sock.sendMessage(targetJid, { text: String(message) });
+    let sent;
+    if (pdfBase64) {
+      try {
+        const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/^data:.*;base64,/, '');
+        const docBuffer = Buffer.from(cleanBase64, 'base64');
+        console.log(`[WHATSAPP DISPATCH] Enviando documento PDF (${docBuffer.length} bytes) a: ${targetJid}...`);
+        sent = await sock.sendMessage(targetJid, {
+          document: docBuffer,
+          mimetype: 'application/pdf',
+          fileName: fileName,
+          caption: String(message || '')
+        });
+      } catch (pdfErr) {
+        console.error('[WHATSAPP PDF ERROR] Falló envío de PDF adjunto, enviando como texto:', pdfErr);
+        sent = await sock.sendMessage(targetJid, { text: String(message || '') });
+      }
+    } else {
+      console.log(`[WHATSAPP DISPATCH] Enviando texto a JID: ${targetJid}...`);
+      sent = await sock.sendMessage(targetJid, { text: String(message) });
+    }
 
     if (sent?.key?.id && sent?.message) {
       messageStore.set(sent.key.id, sent.message);
@@ -205,6 +258,7 @@ app.post('/send', authenticate, async (req, res) => {
       status: 'sent',
       messageId: sent.key.id,
       to: targetJid.replace('@s.whatsapp.net', ''),
+      has_pdf: !!pdfBase64,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
