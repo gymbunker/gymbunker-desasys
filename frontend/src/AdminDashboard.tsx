@@ -2908,9 +2908,10 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
   });
   const totalPeriodRevenue = filteredHistory.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
 
-  // New members in period
+  // New members in period: only explicitly marked new members (m.is_new) who joined within period
   const newMembersInPeriod = (members || []).filter((m: any) => {
-    if (!m.joined_at) return false;
+    if (!m.is_new) return false;
+    if (!m.joined_at) return true;
     const jd = new Date(m.joined_at);
     return jd >= start && jd <= end;
   });
@@ -3148,23 +3149,14 @@ function memberDaysInfo(
 }
 
 function isMemberNew(m: any): boolean {
-  if (!m) return false;
-  if (m.is_new) {
-    if (m.joined_at) {
-      const joinDate = new Date(m.joined_at);
-      const now = new Date();
-      const diffDays = Math.round((now.getTime() - joinDate.getTime()) / 86400000);
-      return diffDays >= 0 && diffDays <= 30;
-    }
-    return true;
-  }
+  if (!m || !m.is_new) return false;
   if (m.joined_at) {
     const joinDate = new Date(m.joined_at);
     const now = new Date();
     const diffDays = Math.round((now.getTime() - joinDate.getTime()) / 86400000);
-    return diffDays >= 0 && diffDays <= 30 && m.status !== 'INACTIVO';
+    return diffDays >= 0 && diffDays <= 30;
   }
-  return false;
+  return true;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -3585,7 +3577,8 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
 
   // Adquisición vs Retención (Socios Nuevos vs Socios que Siguieron Yendo)
   const newMembers = (members || []).filter((m: any) => {
-    if (!m.joined_at) return false;
+    if (!m.is_new) return false;
+    if (!m.joined_at) return true;
     const jd = new Date(m.joined_at);
     return jd >= start && jd <= end;
   });
@@ -3594,9 +3587,9 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
   const activePaidMemberNames = new Set(filteredHistory.map((h: any) => (h.userName || h.member_name || '').toLowerCase()));
 
   const retainedMembers = (members || []).filter((m: any) => {
-    const isOlder = m.joined_at && new Date(m.joined_at) < start;
+    if (m.is_new) return false;
     const hasPaidInPeriod = activePaidMemberIds.has(m.id) || activePaidMemberNames.has((m.name || '').toLowerCase());
-    return isOlder && (hasPaidInPeriod || m.status === 'ACTIVO' || m.status === 'AL DIA');
+    return hasPaidInPeriod || m.status === 'ACTIVO' || m.status === 'AL DIA';
   });
 
   const totalCohort = newMembers.length + retainedMembers.length;
