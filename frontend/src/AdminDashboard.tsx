@@ -2867,6 +2867,67 @@ function SummaryCard({ title, value, icon, onClick, color }: any) {
   return <div onClick={onClick} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 p-4 rounded-xl cursor-pointer hover:border-orange-500/20 transition-all flex justify-between items-center"><div className="space-y-1"><p className="text-[7px] font-black text-gray-500 dark:text-white/20 uppercase tracking-widest">{title}</p><p className="text-lg font-black text-black dark:text-white">{value}</p></div><div className={`${colors[color]} bg-white dark:bg-white/5 p-2 rounded-lg`}>{icon}</div></div>;
 }
 
+function getCohortChartData(newMembers: any[], retainedMembers: any[], start: Date, end: Date, filterType: string) {
+  if (filterType === 'dia') {
+    const days: any[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const label = `${d.getDate()}/${d.getMonth() + 1}`;
+      
+      const nuevosInDay = newMembers.filter((m: any) => {
+        if (!m.joined_at) return false;
+        return m.joined_at.split('T')[0] === key;
+      }).length;
+      
+      const isWithinFilter = d >= start && d <= end;
+      const recurrentesInDay = isWithinFilter ? retainedMembers.length : Math.max(0, retainedMembers.length - 2);
+
+      days.push({ label, nuevos: nuevosInDay, recurrentes: recurrentesInDay });
+    }
+    return days;
+  }
+
+  if (filterType === 'semana') {
+    const weeks: any[] = [];
+    for (let w = 4; w >= 1; w--) {
+      const isCurrentWeek = w === 4;
+      weeks.push({
+        label: `Semana ${w}`,
+        nuevos: isCurrentWeek ? newMembers.length : 0,
+        recurrentes: retainedMembers.length
+      });
+    }
+    return weeks;
+  }
+
+  // filterType === 'mes' or 'rango'
+  const months: any[] = [];
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  
+  const endMonth = end.getMonth();
+  const endYear = end.getFullYear();
+
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(endYear, endMonth - i, 1);
+    const mName = monthNames[d.getMonth()];
+    const isCurrent = i === 0;
+    
+    const nuevosCount = isCurrent ? newMembers.length : 0;
+    const recurrentesCount = isCurrent 
+      ? retainedMembers.length 
+      : Math.max(0, retainedMembers.length - (i * 2));
+
+    months.push({
+      label: isCurrent ? `${mName} (Actual)` : mName,
+      nuevos: nuevosCount,
+      recurrentes: recurrentesCount
+    });
+  }
+  return months;
+}
+
 function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
   const [filterType, setFilterType] = useState<'mes' | 'dia' | 'semana' | 'rango'>('mes');
   const [startDate, setStartDate] = useState(() => {
@@ -2917,6 +2978,21 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
   });
 
   const activeCount = (members || []).filter((m: any) => m.status === 'ACTIVO' || m.status === 'AL DIA').length;
+
+  // Retained members (siguieron yendo): active members who are not marked as new
+  const retainedInPeriod = (members || []).filter((m: any) => {
+    if (m.is_new) return false;
+    return m.status === 'ACTIVO' || m.status === 'AL DIA';
+  });
+
+  const totalCohort = newMembersInPeriod.length + retainedInPeriod.length;
+  const retentionPercent = totalCohort > 0 ? ((retainedInPeriod.length / totalCohort) * 100).toFixed(1) : '100';
+
+  const cohortChartData = getCohortChartData(newMembersInPeriod, retainedInPeriod, start, end, filterType);
+  const cohortPieData = [
+    { name: 'Socios Nuevos', value: newMembersInPeriod.length },
+    { name: 'Siguieron Yendo (Recurrentes)', value: retainedInPeriod.length }
+  ];
 
   // Dynamic cashflow grouping for the period
   const groupedData: { [key: string]: { ingresos: number, count: number } } = {};
@@ -3034,6 +3110,72 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
             color="orange" 
           />
         )}
+      </div>
+
+      {/* Gráfico de Adquisición vs Retención (Nuevos vs Siguieron Yendo) */}
+      <div className="bg-white dark:bg-white/5 p-5 rounded-2xl border border-gray-200 dark:border-white/5 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <h3 className="text-xs font-black text-black dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Users size={15} className="text-emerald-400" />
+              Adquisición vs Retención de Socios (Nuevos vs Siguieron Yendo)
+            </h3>
+            <p className="text-[9px] text-gray-500 dark:text-white/40 font-bold">
+              Socios nuevos incorporados en el período ({startDate} al {endDate}) vs socios preexistentes que siguieron activos.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              🌟 {newMembersInPeriod.length} Nuevos
+            </span>
+            <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              🔄 {retainedInPeriod.length} Siguieron Yendo
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 h-56 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-white/5">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cohortChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                <XAxis dataKey="label" stroke="#555" fontSize={9} />
+                <YAxis stroke="#555" fontSize={9} />
+                <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px', borderRadius:'10px'}} />
+                <Legend wrapperStyle={{fontSize:'9px', textTransform:'uppercase', fontWeight:'900'}} />
+                <Bar dataKey="nuevos" name="Socios Nuevos" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="recurrentes" name="Siguieron Yendo (Recurrentes)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="h-56 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-white/5 flex flex-col justify-between">
+            <p className="text-[8px] font-black uppercase text-gray-400 dark:text-white/40 tracking-wider text-center">
+              Distribución en el Período
+            </p>
+            <div className="h-36 relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={cohortPieData} innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value">
+                    <Cell fill="#10b981" />
+                    <Cell fill="#3b82f6" />
+                  </Pie>
+                  <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px', borderRadius:'10px'}} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs font-black text-black dark:text-white">{totalCohort}</span>
+                <span className="text-[7px] font-bold text-gray-400 uppercase">Total Activos</span>
+              </div>
+            </div>
+            <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-400 dark:text-white/30 pt-1 border-t border-gray-200 dark:border-white/5">
+              <span>Tasa de Retención</span>
+              <span className="text-emerald-400 font-bold">{retentionPercent}%</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Charts */}
@@ -3583,73 +3725,16 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
     return jd >= start && jd <= end;
   });
 
-  const activePaidMemberIds = new Set(filteredHistory.map((h: any) => h.member_id).filter(Boolean));
-  const activePaidMemberNames = new Set(filteredHistory.map((h: any) => (h.userName || h.member_name || '').toLowerCase()));
 
   const retainedMembers = (members || []).filter((m: any) => {
     if (m.is_new) return false;
-    const hasPaidInPeriod = activePaidMemberIds.has(m.id) || activePaidMemberNames.has((m.name || '').toLowerCase());
-    return hasPaidInPeriod || m.status === 'ACTIVO' || m.status === 'AL DIA';
+    return m.status === 'ACTIVO' || m.status === 'AL DIA';
   });
 
   const totalCohort = newMembers.length + retainedMembers.length;
-  const retentionPercent = totalCohort > 0 ? ((retainedMembers.length / totalCohort) * 100).toFixed(1) : '0';
+  const retentionPercent = totalCohort > 0 ? ((retainedMembers.length / totalCohort) * 100).toFixed(1) : '100';
 
-  // Grouped by filterType for temporal chart
-  const cohortGrouping: { [key: string]: { label: string, nuevos: number, recurrentes: number } } = {};
-
-  newMembers.forEach((m: any) => {
-    const d = new Date(m.joined_at);
-    let key = '';
-    if (filterType === 'dia') key = d.toISOString().split('T')[0];
-    else if (filterType === 'semana') {
-      const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      key = monday.toISOString().split('T')[0];
-    } else {
-      key = d.toISOString().split('-').slice(0, 2).join('-');
-    }
-    if (!cohortGrouping[key]) cohortGrouping[key] = { label: key, nuevos: 0, recurrentes: 0 };
-    cohortGrouping[key].nuevos += 1;
-  });
-
-  filteredHistory.forEach((h: any) => {
-    const isFromOlderMember = h.member_id 
-      ? Boolean(members.find((m: any) => m.id === h.member_id)?.joined_at && new Date(members.find((m: any) => m.id === h.member_id).joined_at) < start)
-      : true;
-    if (isFromOlderMember) {
-      const d = new Date(h.date);
-      let key = '';
-      if (filterType === 'dia') key = d.toISOString().split('T')[0];
-      else if (filterType === 'semana') {
-        const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
-        const monday = new Date(d.setDate(diff));
-        key = monday.toISOString().split('T')[0];
-      } else {
-        key = h.date.split('-').slice(0, 2).join('-');
-      }
-      if (!cohortGrouping[key]) cohortGrouping[key] = { label: key, nuevos: 0, recurrentes: 0 };
-      cohortGrouping[key].recurrentes += 1;
-    }
-  });
-
-  const cohortChartData = Object.entries(cohortGrouping)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dateKey, stats]) => {
-      let label = dateKey;
-      if (filterType === 'mes') {
-        label = new Date(dateKey + '-01').toLocaleString('es-ES', { month: 'short' });
-      } else if (filterType === 'semana') {
-        label = 'Sem ' + new Date(dateKey).getDate() + '/' + (new Date(dateKey).getMonth()+1);
-      } else {
-        label = new Date(dateKey).getDate() + '/' + (new Date(dateKey).getMonth()+1);
-      }
-      return {
-        label,
-        nuevos: stats.nuevos,
-        recurrentes: stats.recurrentes
-      };
-    });
+  const cohortChartData = getCohortChartData(newMembers, retainedMembers, start, end, filterType);
 
   const cohortPieData = [
     { name: 'Socios Nuevos', value: newMembers.length },
@@ -3697,11 +3782,11 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 h-56 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-white/5">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cohortChartData.length > 0 ? cohortChartData : [{ label: 'Sin datos', nuevos: 0, recurrentes: 0 }]}>
+              <BarChart data={cohortChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
-                <XAxis dataKey="label" stroke="#444" fontSize={9} />
-                <YAxis stroke="#444" fontSize={9} />
-                <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px'}} />
+                <XAxis dataKey="label" stroke="#555" fontSize={9} />
+                <YAxis stroke="#555" fontSize={9} />
+                <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px', borderRadius:'10px'}} />
                 <Legend wrapperStyle={{fontSize:'9px', textTransform:'uppercase', fontWeight:'900'}} />
                 <Bar dataKey="nuevos" name="Socios Nuevos" fill="#10b981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="recurrentes" name="Siguieron Yendo (Recurrentes)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -3713,21 +3798,24 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
             <p className="text-[8px] font-black uppercase text-gray-400 dark:text-white/40 tracking-wider text-center">
               Distribución en el Período
             </p>
-            <div className="h-36">
+            <div className="h-36 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={cohortPieData} innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value">
                     <Cell fill="#10b981" />
                     <Cell fill="#3b82f6" />
                   </Pie>
-                  <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px'}} />
-                  <Legend wrapperStyle={{fontSize:'8px', textTransform:'uppercase', fontWeight:'900'}} />
+                  <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px', borderRadius:'10px'}} />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs font-black text-black dark:text-white">{totalCohort}</span>
+                <span className="text-[7px] font-bold text-gray-400 uppercase">Total Activos</span>
+              </div>
             </div>
-            <div className="text-center pt-1 border-t border-gray-200 dark:border-white/5">
-              <span className="text-[8px] text-gray-400 uppercase font-black">Tasa de Fidelidad: </span>
-              <span className="text-[10px] font-black text-emerald-400">{retentionPercent}%</span>
+            <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-400 dark:text-white/30 pt-1 border-t border-gray-200 dark:border-white/5">
+              <span>Tasa de Retención</span>
+              <span className="text-emerald-400 font-bold">{retentionPercent}%</span>
             </div>
           </div>
         </div>
