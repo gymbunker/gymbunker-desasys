@@ -1,8 +1,8 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff } from 'lucide-react';
+import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, PieChart, Pie, Cell, Legend
+  LineChart, Line, PieChart, Pie, Cell, Legend, BarChart, Bar
 } from 'recharts';
 import SystemNoticeModal from './components/SystemNoticeModal';
 import SystemModule from './components/SystemModule';
@@ -1660,7 +1660,10 @@ export default function AdminDashboard() {
         days_per_week: selectedItem.daysPerWeek ?? selectedItem.days_per_week ?? 3,
         classes: classesList,
         is_active: true,
-        allow_unification: !!selectedItem.allow_unification
+        allow_unification: !!selectedItem.allow_unification,
+        enable_custom_payment_methods: !!selectedItem.enable_custom_payment_methods,
+        price_cash: selectedItem.enable_custom_payment_methods ? (selectedItem.price_cash !== '' && selectedItem.price_cash != null ? Number(selectedItem.price_cash) : Number(selectedItem.price) || 0) : null,
+        price_transfer: selectedItem.enable_custom_payment_methods ? (selectedItem.price_transfer !== '' && selectedItem.price_transfer != null ? Number(selectedItem.price_transfer) : Number(selectedItem.price) || 0) : null,
       };
       const isEdit = !!selectedItem.id;
       if (isEdit) {
@@ -1985,7 +1988,7 @@ export default function AdminDashboard() {
           setIsPaymentModalOpen(true); 
         }} 
       />;
-      case 'Planes': return <PlansModule plans={plans} onEdit={(p:any)=>{setSelectedItem({...p, allow_unification: !!p.allow_unification, classesInput: (p.classes || []).join(', ')}); setIsEditMode(true); setModalType('plan'); setIsModalOpen(true);}} onDelete={(p:any)=>{ showConfirm("¿Eliminar Plan?", `¿Estás seguro de que deseas eliminar el plan "${p.name}" del sistema?`, async () => { const res = await fetch(`${API_URL}/admin/plans/${p.id}`,{method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={()=>{setSelectedItem({name:'', price:0, daysPerWeek:3, classes:[], classesInput: '', allow_unification: false}); setIsEditMode(false); setModalType('plan'); setIsModalOpen(true);}} />;
+      case 'Planes': return <PlansModule plans={plans} onEdit={(p:any)=>{setSelectedItem({...p, allow_unification: !!p.allow_unification, enable_custom_payment_methods: !!p.enable_custom_payment_methods, price_cash: p.price_cash ?? p.price ?? 0, price_transfer: p.price_transfer ?? p.price ?? 0, classesInput: (p.classes || []).join(', ')}); setIsEditMode(true); setModalType('plan'); setIsModalOpen(true);}} onDelete={(p:any)=>{ showConfirm("¿Eliminar Plan?", `¿Estás seguro de que deseas eliminar el plan "${p.name}" del sistema?`, async () => { const res = await fetch(`${API_URL}/admin/plans/${p.id}`,{method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={()=>{setSelectedItem({name:'', price:0, daysPerWeek:3, classes:[], classesInput: '', allow_unification: false, enable_custom_payment_methods: false, price_cash: '', price_transfer: ''}); setIsEditMode(false); setModalType('plan'); setIsModalOpen(true);}} />;
       case 'Entrenamientos': return <EntrenamientosModule API_URL={API_URL} />;
       case 'Agenda': return <AgendaModule members={members} API_URL={API_URL} setConfirmModal={setConfirmModal} />;
       case 'Mi Perfil': return <ProfileModule user={loggedUser} onSave={async (newPassword: string) => {
@@ -2023,23 +2026,7 @@ export default function AdminDashboard() {
       }} /> : null;
       case 'Finanzas': return userRole === 'gerente' ? <FinanceModule data={financeData} members={members} startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate} filterType={filterType} setFilterType={setFilterType} /> : <NoAccess />;
       case 'Facturación': return (userRole === 'gerente' || userRole === 'administracion') ? <BillingModule members={members} onDeletePayment={(id: number) => { showConfirm("¿Eliminar Cobro?", "¿Estás seguro de que deseas eliminar este registro de cobro?", async () => { const res = await fetch(`${API_URL}/admin/payments/${id}`, { method: 'DELETE' }); if (res.ok) refreshData(); else alert('Error al eliminar'); }); }} /> : <NoAccess />;
-      default: return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <SummaryCard title="Socios Activos" value={members.length} icon={<Users size={16}/>} onClick={() => setActiveTab('Socios')} color="blue" />
-            {(userRole === 'gerente' || userRole === 'administracion') && (
-              <SummaryCard title="Facturas" value={members.flatMap((m:any) => (m.billing_history || [])).length} icon={<Receipt size={16}/>} onClick={() => setActiveTab('Facturación')} color="purple" />
-            )}
-            {userRole === 'gerente' && (
-              <SummaryCard title="Caja Total" value={`$${financeData?.total_revenue?.toLocaleString()}`} icon={<DollarSign size={16}/>} onClick={() => setActiveTab('Finanzas')} color="green" />
-            )}
-          </div>
-          <div className="grid lg:grid-cols-2 gap-4">
-             <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 p-4 rounded-xl"><h3 className="text-[10px] font-black uppercase text-gray-600 dark:text-white/40 mb-3 tracking-widest">Balance de Caja</h3><div className="h-40"><ResponsiveContainer width="100%" height="100%"><AreaChart data={financeData?.cashflow_data}><CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false}/><XAxis dataKey="month" stroke="#444" fontSize={9}/><Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px'}}/><Area type="monotone" dataKey="ingresos" stroke="#3b82f6" strokeWidth={3} fill="#3b82f6" fillOpacity={0.1}/></AreaChart></ResponsiveContainer></div></div>
-             <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 p-4 rounded-xl"><h3 className="text-[10px] font-black uppercase text-gray-600 dark:text-white/40 mb-3 tracking-widest">Actividad Facturación</h3><div className="flex flex-col justify-center h-40 space-y-2">{members.flatMap((m:any)=>(m.billing_history||[]).map((h:any)=>({...h,member_name:m.name}))).sort((a:any,b:any)=>new Date(b.date).getTime()-new Date(a.date).getTime()).slice(0,3).map((h:any,i:number)=>(<div key={i} className="flex justify-between items-center bg-gray-100 dark:bg-black/20 p-2 rounded-lg border border-gray-200 dark:border-white/5"><div><span className="text-[10px] font-black uppercase block">{h.member_name}</span><span className="text-[8px] text-gray-400 dark:text-white/30">{h.date} · {h.method}</span></div><span className="text-green-500 font-black text-xs">${h.amount?.toLocaleString()}</span></div>))}</div></div>
-          </div>
-        </div>
-      );
+      default: return <SummaryModule members={members} financeData={financeData} userRole={userRole} setActiveTab={setActiveTab} />;
     }
   };
 
@@ -2268,6 +2255,84 @@ export default function AdminDashboard() {
                         Permitir unificación con otros planes
                       </label>
                     </div>
+
+                    {/* Diferenciación de precios por método de pago */}
+                    <div className="pt-2 border-t border-gray-200 dark:border-white/10 space-y-3">
+                      <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent rounded-2xl border border-orange-500/20">
+                        <div className="space-y-0.5 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <DollarSign size={13} className="text-orange-500" />
+                            <p className="text-[10px] font-black uppercase text-orange-500">Diferenciar precios por método de pago</p>
+                          </div>
+                          <p className="text-[8px] text-gray-500 dark:text-white/40 leading-tight">
+                            Habilita tarifas diferenciadas para cobros en Efectivo o Transferencia.
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input 
+                            type="checkbox" 
+                            checked={!!selectedItem?.enable_custom_payment_methods} 
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setSelectedItem({
+                                ...selectedItem, 
+                                enable_custom_payment_methods: checked,
+                                price_cash: checked ? (selectedItem?.price_cash ?? selectedItem?.price ?? 0) : selectedItem?.price_cash,
+                                price_transfer: checked ? (selectedItem?.price_transfer ?? selectedItem?.price ?? 0) : selectedItem?.price_transfer
+                              });
+                            }} 
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>
+                        </label>
+                      </div>
+
+                      {selectedItem?.enable_custom_payment_methods && (
+                        <div className="p-4 bg-gray-50 dark:bg-black/30 rounded-2xl border border-orange-500/30 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <p className="text-[9px] font-black uppercase text-orange-400 tracking-wider">
+                            Montos según método de cobro:
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1 bg-white dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-white/10">
+                              <label className="text-[9px] text-emerald-500 uppercase font-black flex items-center gap-1.5">
+                                <Banknote size={13} />
+                                Cobro en Efectivo
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">$</span>
+                                <input 
+                                  type="number" 
+                                  placeholder="Monto efectivo..."
+                                  className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg py-2 pl-7 pr-3 text-black dark:text-white text-xs font-bold outline-none focus:border-emerald-500"
+                                  value={selectedItem?.price_cash ?? ''} 
+                                  onChange={e => setSelectedItem({ ...selectedItem, price_cash: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })} 
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1 bg-white dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-white/10">
+                              <label className="text-[9px] text-cyan-400 uppercase font-black flex items-center gap-1.5">
+                                <Smartphone size={13} />
+                                Cobro por Transferencia
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">$</span>
+                                <input 
+                                  type="number" 
+                                  placeholder="Monto transferencia..."
+                                  className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg py-2 pl-7 pr-3 text-black dark:text-white text-xs font-bold outline-none focus:border-cyan-400"
+                                  value={selectedItem?.price_transfer ?? ''} 
+                                  onChange={e => setSelectedItem({ ...selectedItem, price_transfer: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })} 
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-[8px] text-gray-400 dark:text-white/40 italic">
+                            💡 Al cobrar la cuota a un socio, el monto sugerido se adaptará de acuerdo a si elegís Efectivo o Transferencia.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 {modalType === 'staff' && (
@@ -2433,8 +2498,34 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
   const addPlansList: string[] = member.additional_plans || [];
   const addPlanObjs = addPlansList.map(n => plans.find((p:any) => p.name === n)).filter(Boolean);
 
-  const defaultTotal = (mainPlanObj?.price || 0) + addPlanObjs.reduce((acc: number, curr: any) => acc + (curr?.price || 0), 0);
-  const [amount, setAmount] = useState(defaultTotal);
+  const getPriceForPlan = (plan: any, currentMethod: string) => {
+    if (!plan) return 0;
+    if (plan.enable_custom_payment_methods) {
+      if (currentMethod === 'Efectivo' && plan.price_cash != null && plan.price_cash !== '') {
+        return Number(plan.price_cash);
+      }
+      if (currentMethod === 'Transferencia' && plan.price_transfer != null && plan.price_transfer !== '') {
+        return Number(plan.price_transfer);
+      }
+    }
+    return Number(plan.price) || 0;
+  };
+
+  const calculateTotal = (currentMethod: string) => {
+    const mainP = getPriceForPlan(mainPlanObj, currentMethod);
+    const addP = addPlanObjs.reduce((acc: number, curr: any) => acc + getPriceForPlan(curr, currentMethod), 0);
+    return mainP + addP;
+  };
+
+  const [amount, setAmount] = useState(() => calculateTotal('Efectivo'));
+
+  const handleSelectMethod = (newMethod: string) => {
+    setMethod(newMethod);
+    setAmount(calculateTotal(newMethod));
+  };
+
+  const currentMainPrice = getPriceForPlan(mainPlanObj, method);
+  const isCustomMain = Boolean(mainPlanObj?.enable_custom_payment_methods && ((method === 'Efectivo' && mainPlanObj?.price_cash != null) || (method === 'Transferencia' && mainPlanObj?.price_transfer != null)));
 
   // Fecha de cobro actual (por defecto día de hoy / current_day)
   const today = new Date();
@@ -2487,19 +2578,37 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
          {/* Desglose de planes contratados */}
          <div className="bg-gray-50 dark:bg-black/40 p-3 rounded-2xl border border-gray-200 dark:border-white/10 space-y-1.5">
             <p className="text-[9px] font-black uppercase text-gray-400 dark:text-white/40 tracking-wider">Desglose de Cobro:</p>
-            <div className="flex justify-between text-xs font-bold text-black dark:text-white">
+            <div className="flex justify-between items-center text-xs font-bold text-black dark:text-white">
                <span>Plan Principal ({mainPlanObj?.name || member.membership_type})</span>
-               <span>${mainPlanObj?.price?.toLocaleString() || 0}</span>
+               <div className="flex items-center gap-1.5">
+                 {isCustomMain && (
+                   <span className="text-[7.5px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                     Precio {method}
+                   </span>
+                 )}
+                 <span>${currentMainPrice.toLocaleString()}</span>
+               </div>
             </div>
-            {addPlanObjs.map((ap: any, i: number) => (
-              <div key={i} className="flex justify-between text-xs font-bold text-orange-500">
-                 <span>+ {ap.name} (Adicional)</span>
-                 <span>${ap.price?.toLocaleString() || 0}</span>
-              </div>
-            ))}
+            {addPlanObjs.map((ap: any, i: number) => {
+              const apPrice = getPriceForPlan(ap, method);
+              const isCustomAp = Boolean(ap?.enable_custom_payment_methods && ((method === 'Efectivo' && ap?.price_cash != null) || (method === 'Transferencia' && ap?.price_transfer != null)));
+              return (
+                <div key={i} className="flex justify-between items-center text-xs font-bold text-orange-500">
+                   <span>+ {ap.name} (Adicional)</span>
+                   <div className="flex items-center gap-1.5">
+                     {isCustomAp && (
+                       <span className="text-[7.5px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                         Precio {method}
+                       </span>
+                     )}
+                     <span>${apPrice.toLocaleString()}</span>
+                   </div>
+                </div>
+              );
+            })}
             <div className="border-t border-gray-200 dark:border-white/10 pt-1.5 flex justify-between text-sm font-black text-green-500">
-               <span>Total Sugerido</span>
-               <span>${defaultTotal.toLocaleString()}</span>
+               <span>Total Sugerido ({method})</span>
+               <span>${calculateTotal(method).toLocaleString()}</span>
             </div>
          </div>
 
@@ -2511,12 +2620,19 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
 
          {/* Método de Pago */}
          <div className="space-y-1.5">
-            <label className="text-[9px] text-gray-500 dark:text-white/30 uppercase font-black ml-2">Método de Pago</label>
+            <div className="flex justify-between items-center px-1">
+              <label className="text-[9px] text-gray-500 dark:text-white/30 uppercase font-black">Método de Pago</label>
+              {mainPlanObj?.enable_custom_payment_methods && (
+                <span className="text-[7.5px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                  ✨ Precios Diferenciados Activos
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
-               <PaymentBtn active={method === 'Efectivo'} onClick={()=>setMethod('Efectivo')} label="Efectivo" icon={<Banknote size={15}/>} />
-               <PaymentBtn active={method === 'Tarjeta'} onClick={()=>setMethod('Tarjeta')} label="Tarjeta" icon={<CreditCard size={15}/>} />
-               <PaymentBtn active={method === 'Transferencia'} onClick={()=>setMethod('Transferencia')} label="Transferencia" icon={<Smartphone size={15}/>} />
-               <PaymentBtn active={method === 'QR'} onClick={()=>setMethod('QR')} label="QR" icon={<Smartphone size={15}/>} />
+               <PaymentBtn active={method === 'Efectivo'} onClick={()=>handleSelectMethod('Efectivo')} label="Efectivo" icon={<Banknote size={15}/>} />
+               <PaymentBtn active={method === 'Tarjeta'} onClick={()=>handleSelectMethod('Tarjeta')} label="Tarjeta" icon={<CreditCard size={15}/>} />
+               <PaymentBtn active={method === 'Transferencia'} onClick={()=>handleSelectMethod('Transferencia')} label="Transferencia" icon={<Smartphone size={15}/>} />
+               <PaymentBtn active={method === 'QR'} onClick={()=>handleSelectMethod('QR')} label="QR" icon={<Smartphone size={15}/>} />
             </div>
          </div>
 
@@ -2751,6 +2867,229 @@ function SummaryCard({ title, value, icon, onClick, color }: any) {
   return <div onClick={onClick} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 p-4 rounded-xl cursor-pointer hover:border-orange-500/20 transition-all flex justify-between items-center"><div className="space-y-1"><p className="text-[7px] font-black text-gray-500 dark:text-white/20 uppercase tracking-widest">{title}</p><p className="text-lg font-black text-black dark:text-white">{value}</p></div><div className={`${colors[color]} bg-white dark:bg-white/5 p-2 rounded-lg`}>{icon}</div></div>;
 }
 
+function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
+  const [filterType, setFilterType] = useState<'mes' | 'dia' | 'semana' | 'rango'>('mes');
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  const handleFilterChange = (type: string) => {
+    setFilterType(type as any);
+    const d = new Date();
+    if (type === 'dia') {
+      setStartDate(d.toISOString().split('T')[0]);
+      setEndDate(d.toISOString().split('T')[0]);
+    } else if (type === 'semana') {
+      const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      setStartDate(monday.toISOString().split('T')[0]);
+      setEndDate(new Date().toISOString().split('T')[0]);
+    } else if (type === 'mes') {
+      const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+      setStartDate(firstDay.toISOString().split('T')[0]);
+      setEndDate(new Date().toISOString().split('T')[0]);
+    }
+  };
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59);
+
+  // Billing history in period
+  const allHistory = (members || []).flatMap((m: any) => 
+    (m.billing_history || []).map((h: any) => ({ ...h, userName: m.name, member_id: m.id }))
+  );
+  const filteredHistory = allHistory.filter((h: any) => {
+    const d = new Date(h.date);
+    return d >= start && d <= end;
+  });
+  const totalPeriodRevenue = filteredHistory.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+
+  // New members in period
+  const newMembersInPeriod = (members || []).filter((m: any) => {
+    if (!m.joined_at) return false;
+    const jd = new Date(m.joined_at);
+    return jd >= start && jd <= end;
+  });
+
+  const activeCount = (members || []).filter((m: any) => m.status === 'ACTIVO' || m.status === 'AL DIA').length;
+
+  // Dynamic cashflow grouping for the period
+  const groupedData: { [key: string]: { ingresos: number, count: number } } = {};
+  filteredHistory.forEach((h: any) => {
+    let key = '';
+    const d = new Date(h.date);
+    if (filterType === 'dia') {
+      key = d.toISOString().split('T')[0];
+    } else if (filterType === 'semana') {
+      const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      key = monday.toISOString().split('T')[0];
+    } else {
+      key = h.date.split('-').slice(0, 2).join('-');
+    }
+    if (!groupedData[key]) groupedData[key] = { ingresos: 0, count: 0 };
+    groupedData[key].ingresos += h.amount;
+    groupedData[key].count += 1;
+  });
+
+  const periodCashflow = Object.entries(groupedData)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, stats]) => {
+      let label = dateKey;
+      if (filterType === 'mes') {
+        label = new Date(dateKey + '-01').toLocaleString('es-ES', { month: 'short' });
+      } else if (filterType === 'semana') {
+        label = 'Sem ' + new Date(dateKey).getDate() + '/' + (new Date(dateKey).getMonth()+1);
+      } else {
+        label = new Date(dateKey).getDate() + '/' + (new Date(dateKey).getMonth()+1);
+      }
+      return {
+        month: label,
+        ingresos: stats.ingresos,
+        facturas: stats.count
+      };
+    });
+
+  const displayCashflow = periodCashflow.length > 0 ? periodCashflow : (financeData?.cashflow_data || []);
+
+  return (
+    <div className="space-y-5">
+      {/* Date Filter Bar */}
+      <div className="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm">
+        <div className="flex items-center gap-4 flex-wrap w-full">
+          <div className="space-y-1">
+            <label className="text-[8px] text-gray-500 dark:text-white/40 uppercase font-black">Filtrar por</label>
+            <select 
+              className="block w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-2 text-black dark:text-white text-[9px] font-bold uppercase outline-none focus:border-orange-500" 
+              value={filterType} 
+              onChange={e => handleFilterChange(e.target.value)}
+            >
+              <option value="mes">Mes Actual</option>
+              <option value="dia">Día Actual</option>
+              <option value="semana">Semana Actual</option>
+              <option value="rango">Rango Personalizado</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[8px] text-gray-500 dark:text-white/40 uppercase font-black">Desde</label>
+            <input 
+              type="date" 
+              className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-2 text-black dark:text-white text-[9px] font-bold outline-none focus:border-orange-500" 
+              value={startDate} 
+              onChange={e => { setStartDate(e.target.value); setFilterType('rango'); }}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[8px] text-gray-500 dark:text-white/40 uppercase font-black">Hasta</label>
+            <input 
+              type="date" 
+              className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-2 text-black dark:text-white text-[9px] font-bold outline-none focus:border-orange-500" 
+              value={endDate} 
+              onChange={e => { setEndDate(e.target.value); setFilterType('rango'); }}
+            />
+          </div>
+          <div className="ml-auto text-right hidden sm:block">
+            <span className="text-[8px] uppercase font-black text-gray-400 dark:text-white/30 block">Filtro de Resumen</span>
+            <span className="text-[10px] font-black text-orange-500 uppercase">{startDate} al {endDate}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <SummaryCard 
+          title="Socios Activos" 
+          value={activeCount} 
+          icon={<Users size={16}/>} 
+          onClick={() => setActiveTab('Socios')} 
+          color="blue" 
+        />
+        <SummaryCard 
+          title="Socios Nuevos (Período)" 
+          value={newMembersInPeriod.length} 
+          icon={<Sparkles size={16}/>} 
+          onClick={() => setActiveTab('Socios')} 
+          color="green" 
+        />
+        {(userRole === 'gerente' || userRole === 'administracion') && (
+          <SummaryCard 
+            title="Facturas (Período)" 
+            value={filteredHistory.length} 
+            icon={<Receipt size={16}/>} 
+            onClick={() => setActiveTab('Facturación')} 
+            color="purple" 
+          />
+        )}
+        {userRole === 'gerente' && (
+          <SummaryCard 
+            title="Caja (Período)" 
+            value={`$${totalPeriodRevenue.toLocaleString()}`} 
+            icon={<DollarSign size={16}/>} 
+            onClick={() => setActiveTab('Finanzas')} 
+            color="orange" 
+          />
+        )}
+      </div>
+
+      {/* Charts */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 p-5 rounded-2xl">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-[10px] font-black uppercase text-gray-600 dark:text-white/40 tracking-widest">
+              Balance de Caja ({filterType.toUpperCase()})
+            </h3>
+            <span className="text-xs font-black text-emerald-400">
+              Total: ${totalPeriodRevenue.toLocaleString()}
+            </span>
+          </div>
+          <div className="h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={displayCashflow}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false}/>
+                <XAxis dataKey="month" stroke="#444" fontSize={9}/>
+                <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px'}}/>
+                <Area type="monotone" dataKey="ingresos" stroke="#3b82f6" strokeWidth={3} fill="#3b82f6" fillOpacity={0.15}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 p-5 rounded-2xl">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-[10px] font-black uppercase text-gray-600 dark:text-white/40 tracking-widest">
+              Actividad Facturación Reciente
+            </h3>
+            <span className="text-[9px] font-bold text-gray-400">
+              {filteredHistory.length} registros
+            </span>
+          </div>
+          <div className="flex flex-col justify-center h-44 space-y-2 overflow-y-auto custom-scrollbar pr-1">
+            {filteredHistory.slice().reverse().slice(0, 4).map((h: any, i: number) => (
+              <div key={i} className="flex justify-between items-center bg-gray-50 dark:bg-black/20 p-2.5 rounded-xl border border-gray-200 dark:border-white/5">
+                <div>
+                  <span className="text-[10px] font-black uppercase block text-black dark:text-white">{h.userName}</span>
+                  <span className="text-[8px] text-gray-400 dark:text-white/30">{h.date} · {h.method}</span>
+                </div>
+                <span className="text-green-500 font-black text-xs">${Number(h.amount || 0).toLocaleString()}</span>
+              </div>
+            ))}
+            {filteredHistory.length === 0 && (
+              <p className="text-[9px] text-gray-400 dark:text-white/30 italic text-center py-8">
+                No hay facturas registradas en este período
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function memberDaysInfo(
   joinedAt: string, 
   status: string, 
@@ -2808,6 +3147,26 @@ function memberDaysInfo(
   return { daysIn, daysLeft, overdueDays: 0, totalDays };
 }
 
+function isMemberNew(m: any): boolean {
+  if (!m) return false;
+  if (m.is_new) {
+    if (m.joined_at) {
+      const joinDate = new Date(m.joined_at);
+      const now = new Date();
+      const diffDays = Math.round((now.getTime() - joinDate.getTime()) / 86400000);
+      return diffDays >= 0 && diffDays <= 30;
+    }
+    return true;
+  }
+  if (m.joined_at) {
+    const joinDate = new Date(m.joined_at);
+    const now = new Date();
+    const diffDays = Math.round((now.getTime() - joinDate.getTime()) / 86400000);
+    return diffDays >= 0 && diffDays <= 30 && m.status !== 'INACTIVO';
+  }
+  return false;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, string> = {
     'ACTIVO':     'bg-green-500/15 text-green-400',
@@ -2844,7 +3203,7 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
   const [sendingWsId, setSendingWsId] = useState<number | null>(null);
   const [wsToast, setWsToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const statusOptions = ['TODOS', 'ACTIVO', 'POR VENCER', 'DEUDA', 'INACTIVO'];
+  const statusOptions = ['TODOS', 'NUEVOS', 'ACTIVO', 'POR VENCER', 'DEUDA', 'INACTIVO'];
 
   const showWsToast = (message: string, type: 'success' | 'error' = 'success') => {
     setWsToast({ message, type });
@@ -2885,8 +3244,11 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
 
   const filteredMembers = members
     .filter((m: any) => {
-      const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.dni.includes(searchQuery);
-      const matchStatus = statusFilter === 'TODOS' || m.status === statusFilter;
+      const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) || (m.dni && String(m.dni).includes(searchQuery));
+      let matchStatus = true;
+      if (statusFilter === 'TODOS') matchStatus = true;
+      else if (statusFilter === 'NUEVOS') matchStatus = isMemberNew(m);
+      else matchStatus = m.status === statusFilter;
       return matchSearch && matchStatus;
     })
     .sort((a: any, b: any) => a.name.localeCompare(b.name));
@@ -2910,8 +3272,13 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
           <div className="flex gap-1 flex-wrap">
             {statusOptions.map(s => (
               <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${statusFilter === s ? 'bg-orange-500 text-black' : 'bg-white dark:bg-white/5 text-gray-500 dark:text-white/30 hover:text-black dark:hover:text-white'}`}>
-                {s === 'TODOS' ? `Todos (${members.length})` : s === 'ACTIVO' ? `Al día (${members.filter((m:any)=>m.status==='ACTIVO'||m.status==='AL DIA').length})` : s === 'POR VENCER' ? `Por vencer (${members.filter((m:any)=>m.status==='POR VENCER').length})` : s === 'DEUDA' ? `Deuda (${members.filter((m:any)=>m.status==='DEUDA').length})` : `Inactivo (${members.filter((m:any)=>m.status==='INACTIVO').length})`}
+                className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${statusFilter === s ? (s === 'NUEVOS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-orange-500 text-black') : 'bg-white dark:bg-white/5 text-gray-500 dark:text-white/30 hover:text-black dark:hover:text-white'}`}>
+                {s === 'TODOS' ? `Todos (${members.length})` 
+                  : s === 'NUEVOS' ? `✨ Nuevos (${members.filter(isMemberNew).length})`
+                  : s === 'ACTIVO' ? `Al día (${members.filter((m:any)=>m.status==='ACTIVO'||m.status==='AL DIA').length})` 
+                  : s === 'POR VENCER' ? `Por vencer (${members.filter((m:any)=>m.status==='POR VENCER').length})` 
+                  : s === 'DEUDA' ? `Deuda (${members.filter((m:any)=>m.status==='DEUDA').length})` 
+                  : `Inactivo (${members.filter((m:any)=>m.status==='INACTIVO').length})`}
               </button>
             ))}
           </div>
@@ -2941,6 +3308,12 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     <span className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black truncate">{m.membership_type || '—'}</span>
                     <StatusBadge status={m.status} />
+                    {isMemberNew(m) && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-sm animate-pulse">
+                        <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                        NUEVO
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button 
@@ -2999,27 +3372,135 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
 
 function PlansModule({ plans, onEdit, onDelete, onAddClick }: any) {
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center"><h3 className="font-black text-lg uppercase">Planes</h3><button onClick={onAddClick} className="bg-orange-500 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest">+ Nuevo</button></div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-         {plans.map((p: any) => (
-           <div key={p.id} className="p-6 bg-white dark:bg-white/5 rounded-3xl border border-gray-200 dark:border-white/5 relative group">
-              <div className="flex justify-between items-center mb-2">
-                <p className="text-[8px] font-black text-orange-500 uppercase tracking-widest">{p.name}</p>
-                {p.allow_unification && (
-                  <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 text-[7px] font-black uppercase border border-orange-500/20">
-                    Unificable
+    <div className="space-y-6">
+      {/* Header con descripción */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-white/5 p-5 rounded-3xl border border-gray-200 dark:border-white/5 shadow-sm">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-orange-500/10 text-orange-500 rounded-xl">
+              <Settings size={18} />
+            </div>
+            <h3 className="font-black text-lg uppercase tracking-tight text-black dark:text-white">
+              Planes y Membresías
+            </h3>
+          </div>
+          <p className="text-[10px] text-gray-500 dark:text-white/40 font-bold">
+            Administrá las tarifas del gimnasio y configurá montos diferenciados para Efectivo o Transferencia.
+          </p>
+        </div>
+        <button 
+          onClick={onAddClick} 
+          className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-orange-500/25 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+        >
+          <span>+ Nuevo Plan</span>
+        </button>
+      </div>
+
+      {/* Grid de Planes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {plans.map((p: any) => {
+          const hasCustomMethods = Boolean(p.enable_custom_payment_methods);
+          return (
+            <div 
+              key={p.id} 
+              className="p-5 bg-white dark:bg-white/5 rounded-3xl border border-gray-200 dark:border-white/5 hover:border-orange-500/30 transition-all duration-300 relative group flex flex-col justify-between shadow-lg hover:shadow-orange-500/5"
+            >
+              <div>
+                {/* Top badges */}
+                <div className="flex justify-between items-start gap-2 mb-3">
+                  <span className="px-2.5 py-1 rounded-xl bg-orange-500/10 text-orange-500 text-[8px] font-black uppercase tracking-widest border border-orange-500/20">
+                    {p.name}
                   </span>
+                  {p.allow_unification && (
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[7px] font-black uppercase border border-cyan-500/20">
+                      Unificable
+                    </span>
+                  )}
+                </div>
+
+                {/* Base Price */}
+                <div className="mb-4">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-black dark:text-white tracking-tight">
+                      ${Number(p.price || 0).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-gray-500 dark:text-white/30 font-black uppercase">
+                      / mes (Base)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Differentiated pricing box */}
+                {hasCustomMethods ? (
+                  <div className="mb-4 p-3 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[7.5px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Precios por Método
+                      </span>
+                      <span className="text-[7px] font-bold text-gray-400 dark:text-white/30 uppercase">Automático</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <div className="bg-white/60 dark:bg-black/30 p-2 rounded-xl border border-gray-200/50 dark:border-white/5">
+                        <p className="text-[7px] font-black uppercase text-emerald-500 flex items-center gap-1">
+                          <Banknote size={10} /> Efectivo
+                        </p>
+                        <p className="text-xs font-black text-black dark:text-white mt-0.5">
+                          ${p.price_cash != null ? Number(p.price_cash).toLocaleString() : Number(p.price).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-white/60 dark:bg-black/30 p-2 rounded-xl border border-gray-200/50 dark:border-white/5">
+                        <p className="text-[7px] font-black uppercase text-cyan-400 flex items-center gap-1">
+                          <Smartphone size={10} /> Transf.
+                        </p>
+                        <p className="text-xs font-black text-black dark:text-white mt-0.5">
+                          ${p.price_transfer != null ? Number(p.price_transfer).toLocaleString() : Number(p.price).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4 p-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 text-center">
+                    <p className="text-[8px] font-bold text-gray-400 dark:text-white/30 uppercase tracking-wide">
+                      Mismo precio en todos los métodos
+                    </p>
+                  </div>
                 )}
+
+                {/* Plan Specs */}
+                <div className="space-y-1.5 mb-5 pt-2 border-t border-gray-100 dark:border-white/5">
+                  <div className="flex items-center gap-2 text-[10px] text-gray-600 dark:text-white/60 font-bold">
+                    <CheckCircle size={12} className="text-emerald-500 shrink-0"/> 
+                    <span>{p.daysPerWeek ?? p.days_per_week} días por semana</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-[10px] text-gray-600 dark:text-white/60 font-bold">
+                    <CheckCircle size={12} className="text-emerald-500 shrink-0 mt-0.5"/> 
+                    <span className="leading-tight break-words">
+                      {(p.classes || []).length > 0 ? (p.classes || []).join(', ') : 'Musculación libre'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <p className="text-2xl font-black mb-4">${p.price}<span className="text-[10px] text-gray-500 dark:text-white/20 font-black">/mes</span></p>
-              <div className="space-y-1 mb-6">
-                 <div className="flex items-center gap-2 text-[10px] text-gray-600 dark:text-white/40 font-bold"><CheckCircle size={10} className="text-green-500"/> {p.daysPerWeek ?? p.days_per_week} días/sem</div>
-                 <div className="flex items-start gap-2 text-[10px] text-gray-600 dark:text-white/40 font-bold break-words"><CheckCircle size={10} className="text-green-500 flex-shrink-0 mt-0.5"/> <span className="whitespace-normal leading-tight">{(p.classes || []).join(', ') || 'Musculación'}</span></div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-3 border-t border-gray-100 dark:border-white/5">
+                <button 
+                  onClick={() => onEdit(p)} 
+                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl text-[9px] font-black uppercase text-black dark:text-white transition-all active:scale-95"
+                >
+                  Editar
+                </button>
+                <button 
+                  onClick={() => onDelete(p)} 
+                  className="p-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all active:scale-95"
+                  title="Eliminar Plan"
+                >
+                  <Trash2 size={15}/>
+                </button>
               </div>
-              <div className="flex gap-2"><button onClick={()=>onEdit(p)} className="flex-1 py-2 bg-white dark:bg-white/5 rounded-xl text-[9px] font-black uppercase">Editar</button><button onClick={()=>onDelete(p)} className="p-2 text-red-500/30 hover:text-red-500"><Trash2 size={14}/></button></div>
-           </div>
-         ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -3102,6 +3583,86 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
   const memberMap = Object.fromEntries((members || []).map((m: any) => [m.id, m.name]));
   const debtors = (members || []).filter((m: any) => m.status === 'DEUDA' || m.status === 'POR VENCER');
 
+  // Adquisición vs Retención (Socios Nuevos vs Socios que Siguieron Yendo)
+  const newMembers = (members || []).filter((m: any) => {
+    if (!m.joined_at) return false;
+    const jd = new Date(m.joined_at);
+    return jd >= start && jd <= end;
+  });
+
+  const activePaidMemberIds = new Set(filteredHistory.map((h: any) => h.member_id).filter(Boolean));
+  const activePaidMemberNames = new Set(filteredHistory.map((h: any) => (h.userName || h.member_name || '').toLowerCase()));
+
+  const retainedMembers = (members || []).filter((m: any) => {
+    const isOlder = m.joined_at && new Date(m.joined_at) < start;
+    const hasPaidInPeriod = activePaidMemberIds.has(m.id) || activePaidMemberNames.has((m.name || '').toLowerCase());
+    return isOlder && (hasPaidInPeriod || m.status === 'ACTIVO' || m.status === 'AL DIA');
+  });
+
+  const totalCohort = newMembers.length + retainedMembers.length;
+  const retentionPercent = totalCohort > 0 ? ((retainedMembers.length / totalCohort) * 100).toFixed(1) : '0';
+
+  // Grouped by filterType for temporal chart
+  const cohortGrouping: { [key: string]: { label: string, nuevos: number, recurrentes: number } } = {};
+
+  newMembers.forEach((m: any) => {
+    const d = new Date(m.joined_at);
+    let key = '';
+    if (filterType === 'dia') key = d.toISOString().split('T')[0];
+    else if (filterType === 'semana') {
+      const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      key = monday.toISOString().split('T')[0];
+    } else {
+      key = d.toISOString().split('-').slice(0, 2).join('-');
+    }
+    if (!cohortGrouping[key]) cohortGrouping[key] = { label: key, nuevos: 0, recurrentes: 0 };
+    cohortGrouping[key].nuevos += 1;
+  });
+
+  filteredHistory.forEach((h: any) => {
+    const isFromOlderMember = h.member_id 
+      ? Boolean(members.find((m: any) => m.id === h.member_id)?.joined_at && new Date(members.find((m: any) => m.id === h.member_id).joined_at) < start)
+      : true;
+    if (isFromOlderMember) {
+      const d = new Date(h.date);
+      let key = '';
+      if (filterType === 'dia') key = d.toISOString().split('T')[0];
+      else if (filterType === 'semana') {
+        const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        key = monday.toISOString().split('T')[0];
+      } else {
+        key = h.date.split('-').slice(0, 2).join('-');
+      }
+      if (!cohortGrouping[key]) cohortGrouping[key] = { label: key, nuevos: 0, recurrentes: 0 };
+      cohortGrouping[key].recurrentes += 1;
+    }
+  });
+
+  const cohortChartData = Object.entries(cohortGrouping)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, stats]) => {
+      let label = dateKey;
+      if (filterType === 'mes') {
+        label = new Date(dateKey + '-01').toLocaleString('es-ES', { month: 'short' });
+      } else if (filterType === 'semana') {
+        label = 'Sem ' + new Date(dateKey).getDate() + '/' + (new Date(dateKey).getMonth()+1);
+      } else {
+        label = new Date(dateKey).getDate() + '/' + (new Date(dateKey).getMonth()+1);
+      }
+      return {
+        label,
+        nuevos: stats.nuevos,
+        recurrentes: stats.recurrentes
+      };
+    });
+
+  const cohortPieData = [
+    { name: 'Socios Nuevos', value: newMembers.length },
+    { name: 'Siguieron Yendo (Recurrentes)', value: retainedMembers.length }
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/5">
@@ -3116,6 +3677,67 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
             <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Desde</label><input type="date" className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={startDate} onChange={e=>setStartDate(e.target.value)}/></div>
             <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Hasta</label><input type="date" className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={endDate} onChange={e=>setEndDate(e.target.value)}/></div>
          </div>
+      </div>
+
+      {/* Gráfico: Socios Nuevos vs Retención ("Siguieron yendo") */}
+      <div className="bg-white dark:bg-white/5 p-5 rounded-2xl border border-gray-200 dark:border-white/5 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <h3 className="text-xs font-black text-black dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Users size={15} className="text-emerald-400" />
+              Adquisición vs Retención de Socios (Nuevos vs Siguieron Yendo)
+            </h3>
+            <p className="text-[9px] text-gray-500 dark:text-white/40 font-bold">
+              Comparativa entre socios incorporados en el período y socios preexistentes que mantuvieron su actividad o pago.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-black uppercase">
+              🌟 {newMembers.length} Nuevos
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[8px] font-black uppercase">
+              🔄 {retainedMembers.length} Siguieron Yendo
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 h-56 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-white/5">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cohortChartData.length > 0 ? cohortChartData : [{ label: 'Sin datos', nuevos: 0, recurrentes: 0 }]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                <XAxis dataKey="label" stroke="#444" fontSize={9} />
+                <YAxis stroke="#444" fontSize={9} />
+                <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px'}} />
+                <Legend wrapperStyle={{fontSize:'9px', textTransform:'uppercase', fontWeight:'900'}} />
+                <Bar dataKey="nuevos" name="Socios Nuevos" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="recurrentes" name="Siguieron Yendo (Recurrentes)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="h-56 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-white/5 flex flex-col justify-between">
+            <p className="text-[8px] font-black uppercase text-gray-400 dark:text-white/40 tracking-wider text-center">
+              Distribución en el Período
+            </p>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={cohortPieData} innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value">
+                    <Cell fill="#10b981" />
+                    <Cell fill="#3b82f6" />
+                  </Pie>
+                  <Tooltip contentStyle={{backgroundColor:'#111', border:'none', fontSize:'10px'}} />
+                  <Legend wrapperStyle={{fontSize:'8px', textTransform:'uppercase', fontWeight:'900'}} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-center pt-1 border-t border-gray-200 dark:border-white/5">
+              <span className="text-[8px] text-gray-400 uppercase font-black">Tasa de Fidelidad: </span>
+              <span className="text-[10px] font-black text-emerald-400">{retentionPercent}%</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

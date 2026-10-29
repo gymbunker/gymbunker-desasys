@@ -46,6 +46,7 @@ class MemberBase(BaseModel):
     fixed_billing_day: Optional[int] = None
     keep_billing_day: Optional[bool] = False
     next_due_date: Optional[datetime] = None
+    is_new: Optional[bool] = False
 
 class MemberCreate(BaseModel):
     dni: Optional[str] = None
@@ -64,6 +65,7 @@ class MemberCreate(BaseModel):
     fixed_billing_day: Optional[int] = None
     keep_billing_day: Optional[bool] = False
     next_due_date: Optional[datetime] = None
+    is_new: Optional[bool] = False
 
 class MemberSchema(MemberBase):
     id: int
@@ -149,6 +151,9 @@ class PlanBase(BaseModel):
     classes: List = []
     is_active: bool = True
     allow_unification: Optional[bool] = False
+    enable_custom_payment_methods: Optional[bool] = False
+    price_cash: Optional[float] = None
+    price_transfer: Optional[float] = None
 
 class PlanCreate(PlanBase):
     pass

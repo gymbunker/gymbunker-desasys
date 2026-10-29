@@ -22,6 +22,10 @@ def auto_migrate():
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
         "ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_date TIMESTAMP;",
         "ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS enable_custom_payment_methods BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS price_cash DOUBLE PRECISION;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS price_transfer DOUBLE PRECISION;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS is_new BOOLEAN DEFAULT FALSE;",
         "UPDATE members SET dni = NULL WHERE dni = '' OR TRIM(dni) = '';",
         "UPDATE members SET email = NULL WHERE email = '' OR TRIM(email) = '';",
         "UPDATE members SET phone = NULL WHERE phone = '' OR TRIM(phone) = '';"

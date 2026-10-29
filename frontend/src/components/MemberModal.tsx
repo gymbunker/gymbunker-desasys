@@ -4,7 +4,10 @@ import ProgressChart from './ProgressChart';
 
 export default function MemberModal({ member, plans, API_URL, onSave, onClose }: any) {
   const [activeTab, setActiveTab] = useState<'datos' | 'entrenamiento' | 'progreso'>('datos');
-  const [formData, setFormData] = useState(member);
+  const [formData, setFormData] = useState(() => ({
+    ...member,
+    is_new: member?.id ? !!member.is_new : true
+  }));
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordTouched, setPasswordTouched] = useState(false);
@@ -187,6 +190,8 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
     cleanFormData.email = cleanFormData.email?.trim() ? cleanFormData.email.trim() : null;
     cleanFormData.phone = cleanFormData.phone?.trim() ? cleanFormData.phone.trim() : null;
 
+    cleanFormData.is_new = Boolean(formData?.is_new);
+
     if (passwordTouched && newPassword.trim()) {
       cleanFormData.password = newPassword.trim();
     } else if (cleanFormData.id) {
@@ -257,6 +262,27 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
                      <option value="INACTIVO">Inactivo (Dado de baja)</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="p-3.5 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent rounded-2xl border border-emerald-500/30 flex items-center justify-between transition-all">
+                <div className="space-y-0.5 pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <p className="text-[10px] font-black uppercase text-emerald-400">Cartelito "NUEVO" (1er mes)</p>
+                  </div>
+                  <p className="text-[8px] text-gray-500 dark:text-white/40 leading-tight">
+                    Habilita la insignia "NUEVO" para el primer mes de ingreso y permite filtrar al socio rápidamente.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={!!formData?.is_new} 
+                    onChange={e => setFormData({ ...formData, is_new: e.target.checked })} 
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+                </label>
               </div>
 
               <div className="space-y-2 mt-4 p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-200 dark:border-white/10">

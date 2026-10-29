@@ -30,6 +30,7 @@ class Member(Base):
     routine = Column(JSON, nullable=True)
     routine_documents = Column(JSON, default=[])
     training_plan_id = Column(Integer, ForeignKey("training_plans.id"), nullable=True)
+    is_new = Column(Boolean, default=False)
     
     payments = relationship("Payment", back_populates="member")
     bookings = relationship("Booking", back_populates="member")
@@ -116,6 +117,9 @@ class Plan(Base):
     classes = Column(JSON, default=[])
     is_active = Column(Boolean, default=True)
     allow_unification = Column(Boolean, default=False)
+    enable_custom_payment_methods = Column(Boolean, default=False)
+    price_cash = Column(Float, nullable=True)
+    price_transfer = Column(Float, nullable=True)
 
 class Exercise(Base):
     __tablename__ = "exercises"
