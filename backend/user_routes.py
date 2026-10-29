@@ -70,23 +70,37 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
         member.password = hash_password(credentials.password)
         db.commit()
     
-    if member.joined_at and member.status != 'INACTIVO':
-        membership_type = (member.membership_type or "").upper()
-        validity_days = 30
-        if "TRIMESTRAL" in membership_type:
-            validity_days = 90
-        elif "SEMESTRAL" in membership_type:
-            validity_days = 180
-        elif "ANUAL" in membership_type:
-            validity_days = 365
+    if member.status != 'INACTIVO':
+        now = datetime.datetime.utcnow()
+        if member.next_due_date:
+            days_until_due = (member.next_due_date.date() - now.date()).days
+            if days_until_due <= -10:
+                member.status = 'INACTIVO'
+            elif days_until_due < 0:
+                member.status = 'DEUDA'
+            elif days_until_due <= 7:
+                member.status = 'POR VENCER'
+            else:
+                member.status = 'ACTIVO'
+        elif member.joined_at:
+            membership_type = (member.membership_type or "").upper()
+            validity_days = 30
+            if "TRIMESTRAL" in membership_type:
+                validity_days = 90
+            elif "SEMESTRAL" in membership_type:
+                validity_days = 180
+            elif "ANUAL" in membership_type:
+                validity_days = 365
 
-        days_since = (datetime.datetime.utcnow() - member.joined_at).days
-        if days_since >= validity_days:
-            member.status = 'DEUDA'
-        elif days_since >= validity_days - 7:
-            member.status = 'POR VENCER'
-        else:
-            member.status = 'ACTIVO'
+            days_since = (now - member.joined_at).days
+            if days_since >= validity_days + 10:
+                member.status = 'INACTIVO'
+            elif days_since >= validity_days:
+                member.status = 'DEUDA'
+            elif days_since >= validity_days - 7:
+                member.status = 'POR VENCER'
+            else:
+                member.status = 'ACTIVO'
         db.commit()
         
     streak_count, streak_msg = calculate_member_streak_and_message(member.id, db)

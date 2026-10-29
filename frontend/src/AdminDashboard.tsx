@@ -1897,7 +1897,77 @@ export default function AdminDashboard() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'Socios': return <MembersModule API_URL={API_URL} members={members} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onHistory={(m:any)=>{ setSelectedItem(m); setMemberCheckins([]); setCheckinStats(null); setModalType('history'); setIsModalOpen(true); fetch(`${API_URL}/admin/members/${m.id}/checkins`).then(r=>r.json()).then(data=>{ const checkinsList = Array.isArray(data) ? data : (data.checkins || []); setMemberCheckins(checkinsList); setCheckinStats({ total: data.total_sessions || 0, used: data.sessions_used || 0, remaining: data.sessions_remaining || 0, plans_breakdown: data.plans_breakdown || null }); }).catch(()=>{}); }} onEdit={(m: any) => { const validPlan = plans.find((p:any) => p.name === m.membership_type)?.name || plans[0]?.name || ''; setSelectedItem({...m, membership_type: validPlan}); setIsEditMode(true); setModalType('member'); setIsModalOpen(true); }} onDelete={(id: any) => { showConfirm("¿Dar de baja socio?", "¿Estás seguro de que deseas dar de baja este socio?", async () => { const res = await fetch(`${API_URL}/admin/members/${id}`, {method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={() => { setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: plans[0]?.name || ''}); setIsEditMode(false); setModalType('member'); setIsModalOpen(true); }} onPayClick={(m: any) => { setSelectedItem(m); setIsPaymentModalOpen(true); }} />;
+      case 'Socios': return <MembersModule 
+        API_URL={API_URL} 
+        members={members} 
+        searchQuery={searchQuery} 
+        setSearchQuery={setSearchQuery} 
+        onHistory={(m:any)=>{ 
+          setSelectedItem(m); 
+          setMemberCheckins([]); 
+          setCheckinStats(null); 
+          setModalType('history'); 
+          setIsModalOpen(true); 
+          fetch(`${API_URL}/admin/members/${m.id}/checkins`).then(r=>r.json()).then(data=>{ 
+            const checkinsList = Array.isArray(data) ? data : (data.checkins || []); 
+            setMemberCheckins(checkinsList); 
+            setCheckinStats({ total: data.total_sessions || 0, used: data.sessions_used || 0, remaining: data.sessions_remaining || 0, plans_breakdown: data.plans_breakdown || null }); 
+          }).catch(()=>{}); 
+        }} 
+        onEdit={(m: any) => { 
+          const validPlan = plans.find((p:any) => p.name === m.membership_type)?.name || plans[0]?.name || ''; 
+          setSelectedItem({...m, membership_type: validPlan}); 
+          setIsEditMode(true); 
+          setModalType('member'); 
+          setIsModalOpen(true); 
+        }} 
+        onDelete={(m: any) => { 
+          showConfirm(
+            "¿Dar de baja socio?", 
+            `¿Estás seguro de que deseas dar de baja a ${m.name}? Su estado pasará a INACTIVO sin borrar sus datos ni su historial.`, 
+            async () => { 
+              const res = await fetch(`${API_URL}/admin/members/${m.id}`, { method: 'DELETE' }); 
+              if (res.ok) refreshData(); 
+            }
+          ); 
+        }} 
+        onReactivate={(m: any) => {
+          showConfirm(
+            "¿Reactivar socio?",
+            `¿Deseas reactivar a ${m.name}? Su estado volverá a estar AL DÍA.`,
+            async () => {
+              const res = await fetch(`${API_URL}/admin/members/${m.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...m, status: 'ACTIVO' })
+              });
+              if (res.ok) refreshData();
+            }
+          );
+        }}
+        onPermanentDelete={(m: any) => {
+          showConfirm(
+            "¿Eliminar socio definitivamente?",
+            `¿Estás seguro de que deseas eliminar permanentemente a ${m.name} de la base de datos? Esta acción borrará al socio y sus pagos.`,
+            async () => {
+              const res = await fetch(`${API_URL}/admin/members/${m.id}?permanent=true`, {
+                method: 'DELETE'
+              });
+              if (res.ok) refreshData();
+            }
+          );
+        }}
+        onAddClick={() => { 
+          setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: plans[0]?.name || ''}); 
+          setIsEditMode(false); 
+          setModalType('member'); 
+          setIsModalOpen(true); 
+        }} 
+        onPayClick={(m: any) => { 
+          setSelectedItem(m); 
+          setIsPaymentModalOpen(true); 
+        }} 
+      />;
       case 'Planes': return <PlansModule plans={plans} onEdit={(p:any)=>{setSelectedItem({...p, allow_unification: !!p.allow_unification, classesInput: (p.classes || []).join(', ')}); setIsEditMode(true); setModalType('plan'); setIsModalOpen(true);}} onDelete={(p:any)=>{ showConfirm("¿Eliminar Plan?", `¿Estás seguro de que deseas eliminar el plan "${p.name}" del sistema?`, async () => { const res = await fetch(`${API_URL}/admin/plans/${p.id}`,{method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={()=>{setSelectedItem({name:'', price:0, daysPerWeek:3, classes:[], classesInput: '', allow_unification: false}); setIsEditMode(false); setModalType('plan'); setIsModalOpen(true);}} />;
       case 'Entrenamientos': return <EntrenamientosModule API_URL={API_URL} />;
       case 'Agenda': return <AgendaModule members={members} API_URL={API_URL} setConfirmModal={setConfirmModal} />;
@@ -2681,6 +2751,10 @@ function memberDaysInfo(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  if (status === 'INACTIVO') {
+    return { daysIn: 0, daysLeft: 0, overdueDays: 0, totalDays };
+  }
+
   if (nextDueDateStr) {
     const dueDate = new Date(nextDueDateStr.includes('T') ? nextDueDateStr : `${nextDueDateStr}T00:00:00`);
     dueDate.setHours(0, 0, 0, 0);
@@ -2748,7 +2822,7 @@ function WhatsAppIcon({ size = 14, className = "" }: { size?: number; className?
   );
 }
 
-function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHistory, searchQuery, setSearchQuery, API_URL }: any) {
+function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDelete, onAddClick, onPayClick, onHistory, searchQuery, setSearchQuery, API_URL }: any) {
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
   const [sendingWsId, setSendingWsId] = useState<number | null>(null);
   const [wsToast, setWsToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -2871,25 +2945,32 @@ function MembersModule({ members, onEdit, onDelete, onAddClick, onPayClick, onHi
               <div className="mb-3 px-1">
                 <div className="flex items-center justify-between text-[7px] text-gray-400 dark:text-white/30 font-black uppercase mb-1">
                   <span>
-                    {daysLeft <= 0 ? (overdueDays > 0 ? `${overdueDays}d de deuda` : '0d restantes') : `${daysLeft}d restantes`}
+                    {m.status === 'INACTIVO' ? 'Socio Inactivo' : daysLeft <= 0 ? (overdueDays > 0 ? `${overdueDays}d de deuda` : '0d restantes') : `${daysLeft}d restantes`}
                   </span>
                   {isFixed ? (
                     <span className="text-orange-400 font-bold bg-orange-500/10 px-1.5 py-0.2 rounded border border-orange-500/20" title={`Día ${fixedDay} fijo recurrente`}>
                       Día {fixedDay} fijo
                     </span>
                   ) : (
-                    <span>Día {daysIn}/${totalDays}</span>
+                    <span>{m.status === 'INACTIVO' ? 'Baja' : `Día ${daysIn}/${totalDays}`}</span>
                   )}
                 </div>
                 <div className="w-full h-1 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all ${m.status === 'DEUDA' ? 'bg-red-500' : m.status === 'POR VENCER' ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: m.status === 'DEUDA' ? '100%' : `${Math.min(100, (daysIn / totalDays) * 100)}%` }} />
+                  <div className={`h-full rounded-full transition-all ${m.status === 'INACTIVO' ? 'bg-gray-500' : m.status === 'DEUDA' ? 'bg-red-500' : m.status === 'POR VENCER' ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: m.status === 'INACTIVO' ? '0%' : m.status === 'DEUDA' ? '100%' : `${Math.min(100, (daysIn / totalDays) * 100)}%` }} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => onPayClick(m)} className="col-span-2 py-2 bg-green-500/10 text-green-500 rounded-lg text-[8px] font-black uppercase hover:bg-green-500 hover:text-black dark:text-white transition-all">Cobrar</button>
                 <button onClick={() => onEdit(m)} className="py-2 bg-white dark:bg-white/5 text-gray-600 dark:text-white/40 rounded-lg text-[8px] font-black uppercase">Editar</button>
                 <button onClick={() => onHistory(m)} className="py-2 bg-white dark:bg-white/5 text-orange-400 rounded-lg text-[8px] font-black uppercase">Historial</button>
-                <button onClick={() => onDelete(m.id)} className="col-span-2 py-2 bg-red-500/10 text-red-500 rounded-lg text-[8px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all">Dar de Baja</button>
+                {m.status === 'INACTIVO' ? (
+                  <>
+                    <button onClick={() => onReactivate(m)} className="py-2 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-lg text-[8px] font-black uppercase transition-all" title="Reactivar socio a estado Al Día">Reactivar</button>
+                    <button onClick={() => onPermanentDelete(m)} className="py-2 bg-red-500/15 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[8px] font-black uppercase transition-all" title="Eliminar definitivamente de la base de datos">Eliminar</button>
+                  </>
+                ) : (
+                  <button onClick={() => onDelete(m)} className="col-span-2 py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[8px] font-black uppercase opacity-75 group-hover:opacity-100 transition-all" title="Dar de baja (pasa a Inactivo sin borrar)">Dar de Baja</button>
+                )}
               </div>
             </div>
           );

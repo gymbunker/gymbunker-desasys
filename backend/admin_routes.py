@@ -112,7 +112,9 @@ def get_all_members(db: Session = Depends(get_db)):
         if m.status != "INACTIVO":
             if m.next_due_date:
                 days_until_due = (m.next_due_date.date() - now.date()).days
-                if days_until_due < 0:
+                if days_until_due <= -10:
+                    new_status = "INACTIVO"
+                elif days_until_due < 0:
                     new_status = "DEUDA"
                 elif days_until_due <= 7:
                     new_status = "POR VENCER"
@@ -129,7 +131,9 @@ def get_all_members(db: Session = Depends(get_db)):
                     validity_days = 365
 
                 days_since = (now - m.joined_at).days
-                if days_since >= validity_days:
+                if days_since >= validity_days + 10:
+                    new_status = "INACTIVO"
+                elif days_since >= validity_days:
                     new_status = "DEUDA"
                 elif days_since >= validity_days - 7:
                     new_status = "POR VENCER"
@@ -241,7 +245,9 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
             now_date = datetime.datetime.utcnow().date()
             due_date = next_due.date() if isinstance(next_due, datetime.datetime) else datetime.date.fromisoformat(str(next_due)[:10])
             days_until_due = (due_date - now_date).days
-            if days_until_due < 0:
+            if days_until_due <= -10:
+                data['status'] = 'INACTIVO'
+            elif days_until_due < 0:
                 data['status'] = 'DEUDA'
             elif days_until_due <= 7:
                 data['status'] = 'POR VENCER'
@@ -258,7 +264,9 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
                 validity_days = 365
 
             days_since = (datetime.datetime.utcnow() - joined).days
-            if days_since >= validity_days:
+            if days_since >= validity_days + 10:
+                data['status'] = 'INACTIVO'
+            elif days_since >= validity_days:
                 data['status'] = 'DEUDA'
             elif days_since >= validity_days - 7:
                 data['status'] = 'POR VENCER'
@@ -1283,13 +1291,18 @@ def calculate_dynamic_price(db: Session = Depends(get_db)):
     return {"calculated_price": round(base_price * demand_factor, 2), "demand_factor": round(demand_factor, 2)}
 
 @router.delete("/members/{member_id}")
-def delete_member(member_id: int, db: Session = Depends(get_db)):
+def delete_member(member_id: int, permanent: bool = False, db: Session = Depends(get_db)):
     member = db.query(models.Member).get(member_id)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    db.delete(member)
-    db.commit()
-    return {"status": "deleted"}
+    if permanent:
+        db.delete(member)
+        db.commit()
+        return {"status": "deleted"}
+    else:
+        member.status = "INACTIVO"
+        db.commit()
+        return {"status": "inactivo"}
 
 @router.get("/finance/summary")
 def get_finance_summary(db: Session = Depends(get_db)):

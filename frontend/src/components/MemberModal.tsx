@@ -230,11 +230,22 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
                  <input type="text" placeholder="WhatsApp / Número" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
                  <input type="email" placeholder="Correo Electrónico" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Plan Principal</label>
-                <select className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs font-bold uppercase outline-none focus:border-orange-500" value={formData?.membership_type || plans[0]?.name || ''} onChange={e => setFormData({...formData, membership_type: e.target.value})}>
-                   {plans.map((p:any) => <option key={p.id} value={p.name}>{p.name}</option>)}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Plan Principal</label>
+                  <select className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs font-bold uppercase outline-none focus:border-orange-500" value={formData?.membership_type || plans[0]?.name || ''} onChange={e => setFormData({...formData, membership_type: e.target.value})}>
+                     {plans.map((p:any) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Estado del Socio</label>
+                  <select className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs font-bold uppercase outline-none focus:border-orange-500" value={formData?.status || 'ACTIVO'} onChange={e => setFormData({...formData, status: e.target.value})}>
+                     <option value="ACTIVO">Al día (ACTIVO)</option>
+                     <option value="POR VENCER">Por vencer</option>
+                     <option value="DEUDA">En Deuda</option>
+                     <option value="INACTIVO">Inactivo (Dado de baja)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2 mt-4 p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-200 dark:border-white/10">
