@@ -173,20 +173,36 @@ def get_all_members(db: Session = Depends(get_db)):
 def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     print(f"Creating member: {member.name} with DNI {member.dni}")
     data = member.dict()
-    if not data.get('email'):
-        data['email'] = None
-    else:
-        clean_email = data['email'].strip().lower()
-        data['email'] = clean_email
-        dup = db.query(models.Member).filter(func.lower(models.Member.email) == clean_email).first()
-        if dup:
+
+    # DNI sanitization: None if blank or empty
+    raw_dni = data.get('dni')
+    clean_dni = str(raw_dni).strip() if raw_dni is not None and str(raw_dni).strip() != "" else None
+    data['dni'] = clean_dni
+    if clean_dni:
+        dup_dni = db.query(models.Member).filter(models.Member.dni == clean_dni).first()
+        if dup_dni:
             raise HTTPException(
                 status_code=400,
-                detail=f"El correo '{clean_email}' ya está registrado para el socio {dup.name} (DNI: {dup.dni})."
+                detail=f"El DNI '{clean_dni}' ya está registrado para el socio {dup_dni.name}."
             )
 
-    if not data.get('phone'):
-        data['phone'] = None
+    # Email sanitization: None if blank or empty
+    raw_email = data.get('email')
+    clean_email = str(raw_email).strip().lower() if raw_email is not None and str(raw_email).strip() != "" else None
+    data['email'] = clean_email
+    if clean_email:
+        dup_email = db.query(models.Member).filter(func.lower(models.Member.email) == clean_email).first()
+        if dup_email:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El correo '{clean_email}' ya está registrado para el socio {dup_email.name} (DNI: {dup_email.dni or 'Sin DNI'})."
+            )
+
+    # Phone sanitization: None if blank or empty
+    raw_phone = data.get('phone')
+    clean_phone = str(raw_phone).strip() if raw_phone is not None and str(raw_phone).strip() != "" else None
+    data['phone'] = clean_phone
+
     if not data.get('joined_at'):
         data['joined_at'] = datetime.datetime.utcnow()
     if data.get('password'):
@@ -203,9 +219,15 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
         m_dict = schemas.MemberSchema.from_orm(db_member).dict()
         m_dict["password"] = ""
         return m_dict
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado).")
+        err_msg = str(e).lower()
+        if "dni" in err_msg:
+            raise HTTPException(status_code=400, detail="El DNI ingresado ya se encuentra registrado para otro socio.")
+        elif "email" in err_msg:
+            raise HTTPException(status_code=400, detail="El correo ingresado ya se encuentra registrado para otro socio.")
+        else:
+            raise HTTPException(status_code=400, detail="Error de datos duplicados (verifique DNI o Correo).")
     except Exception as e:
         db.rollback()
         print(f"Error creating member: {e}")
@@ -218,23 +240,42 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         raise HTTPException(status_code=404, detail="Member not found")
 
     data = member_data.dict()
-    if not data.get('email'):
-        data['email'] = None
-    else:
-        clean_email = data['email'].strip().lower()
-        data['email'] = clean_email
-        dup = db.query(models.Member).filter(
+
+    # DNI sanitization: None if blank or empty
+    raw_dni = data.get('dni')
+    clean_dni = str(raw_dni).strip() if raw_dni is not None and str(raw_dni).strip() != "" else None
+    data['dni'] = clean_dni
+    if clean_dni:
+        dup_dni = db.query(models.Member).filter(
+            models.Member.dni == clean_dni,
+            models.Member.id != member_id
+        ).first()
+        if dup_dni:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El DNI '{clean_dni}' ya está registrado para el socio {dup_dni.name}."
+            )
+
+    # Email sanitization: None if blank or empty
+    raw_email = data.get('email')
+    clean_email = str(raw_email).strip().lower() if raw_email is not None and str(raw_email).strip() != "" else None
+    data['email'] = clean_email
+    if clean_email:
+        dup_email = db.query(models.Member).filter(
             func.lower(models.Member.email) == clean_email,
             models.Member.id != member_id
         ).first()
-        if dup:
+        if dup_email:
             raise HTTPException(
                 status_code=400,
-                detail=f"El correo '{clean_email}' ya está registrado para el socio {dup.name} (DNI: {dup.dni})."
+                detail=f"El correo '{clean_email}' ya está registrado para el socio {dup_email.name} (DNI: {dup_email.dni or 'Sin DNI'})."
             )
 
-    if not data.get('phone'):
-        data['phone'] = None
+    # Phone sanitization: None if blank or empty
+    raw_phone = data.get('phone')
+    clean_phone = str(raw_phone).strip() if raw_phone is not None and str(raw_phone).strip() != "" else None
+    data['phone'] = clean_phone
+
     if not data.get('joined_at'):
         data['joined_at'] = db_member.joined_at
     # Recalculate status from next_due_date (if present) or joined_at so editing reflects correctly
@@ -294,9 +335,15 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         m_dict = schemas.MemberSchema.from_orm(db_member).dict()
         m_dict["password"] = ""
         return m_dict
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado en otro socio).")
+        err_msg = str(e).lower()
+        if "dni" in err_msg:
+            raise HTTPException(status_code=400, detail="El DNI ingresado ya se encuentra registrado para otro socio.")
+        elif "email" in err_msg:
+            raise HTTPException(status_code=400, detail="El correo ingresado ya se encuentra registrado para otro socio.")
+        else:
+            raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado en otro socio).")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))

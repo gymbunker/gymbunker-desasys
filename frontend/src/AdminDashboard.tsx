@@ -1683,8 +1683,26 @@ export default function AdminDashboard() {
   };
   const handleSaveMember = async (formData: any = selectedItem) => {
     try {
+      const payload = { ...formData };
+      if (typeof payload.dni === 'string') {
+        payload.dni = payload.dni.trim() || null;
+      } else if (!payload.dni) {
+        payload.dni = null;
+      }
+
+      if (typeof payload.email === 'string') {
+        payload.email = payload.email.trim() || null;
+      } else if (!payload.email) {
+        payload.email = null;
+      }
+
+      if (typeof payload.phone === 'string') {
+        payload.phone = payload.phone.trim() || null;
+      } else if (!payload.phone) {
+        payload.phone = null;
+      }
+
       if (isEditMode) {
-        const payload = { ...formData };
         if (!payload.password || payload.password.trim() === '' || payload.password.startsWith('pbkdf2:')) {
           delete payload.password;
         }
@@ -1701,21 +1719,20 @@ export default function AdminDashboard() {
           return;
         }
       } else {
-        const payload = { ...formData };
         const res = await fetch(`${API_URL}/admin/members`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...payload,
             password: payload.password?.trim() || '123',
-            photo_url: payload.photo_url || `https://i.pravatar.cc/300?u=${payload.dni}`
+            photo_url: payload.photo_url || (payload.dni ? `https://i.pravatar.cc/300?u=${payload.dni}` : `https://i.pravatar.cc/300?u=${encodeURIComponent(payload.name || 'member')}`)
           })
         });
         if (res.ok) {
           refreshData();
         } else {
           const errData = await res.json().catch(() => ({}));
-          alert(errData.detail || "Error al crear socio. Verifique si el DNI ya existe.");
+          alert(errData.detail || "Error al crear socio. Verifique los datos ingresados.");
           return;
         }
       }

@@ -21,7 +21,10 @@ def auto_migrate():
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS keep_billing_day BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
         "ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_date TIMESTAMP;",
-        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;"
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
+        "UPDATE members SET dni = NULL WHERE dni = '' OR TRIM(dni) = '';",
+        "UPDATE members SET email = NULL WHERE email = '' OR TRIM(email) = '';",
+        "UPDATE members SET phone = NULL WHERE phone = '' OR TRIM(phone) = '';"
     ]
     for sql in migrations:
         try:

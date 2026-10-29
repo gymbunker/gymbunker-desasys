@@ -176,6 +176,17 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
 
   const handleSaveInternal = () => {
     const cleanFormData = { ...formData };
+    if (!cleanFormData.name || !cleanFormData.name.trim()) {
+      alert("Por favor ingresá el nombre del socio.");
+      return;
+    }
+    cleanFormData.name = cleanFormData.name.trim();
+
+    // DNI, email y teléfono son opcionales; si están vacíos se envían como null para evitar errores de duplicados
+    cleanFormData.dni = cleanFormData.dni?.trim() ? cleanFormData.dni.trim() : null;
+    cleanFormData.email = cleanFormData.email?.trim() ? cleanFormData.email.trim() : null;
+    cleanFormData.phone = cleanFormData.phone?.trim() ? cleanFormData.phone.trim() : null;
+
     if (passwordTouched && newPassword.trim()) {
       cleanFormData.password = newPassword.trim();
     } else if (cleanFormData.id) {
@@ -223,12 +234,12 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
           {activeTab === 'datos' && (
             <div className="space-y-4 w-full">
               <div className="grid grid-cols-2 gap-4">
-                 <input type="text" placeholder="Nombre Completo" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-                 <input type="text" placeholder="DNI" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.dni || ''} onChange={e => setFormData({...formData, dni: e.target.value})} />
+                 <input type="text" placeholder="Nombre Completo *" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                 <input type="text" placeholder="DNI (Opcional)" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.dni || ''} onChange={e => setFormData({...formData, dni: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                 <input type="text" placeholder="WhatsApp / Número" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                 <input type="email" placeholder="Correo Electrónico" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
+                 <input type="text" placeholder="WhatsApp / Teléfono (Opcional)" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                 <input type="email" placeholder="Correo Electrónico (Opcional)" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">

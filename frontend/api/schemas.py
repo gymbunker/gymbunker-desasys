@@ -30,7 +30,7 @@ class MemberPaymentSchema(BaseModel):
         }
 
 class MemberBase(BaseModel):
-    dni: str
+    dni: Optional[str] = None
     name: str
     email: Optional[str] = None
     status: str = "ACTIVO"
@@ -48,7 +48,7 @@ class MemberBase(BaseModel):
     next_due_date: Optional[datetime] = None
 
 class MemberCreate(BaseModel):
-    dni: str
+    dni: Optional[str] = None
     name: str
     email: Optional[str] = None
     status: str = "ACTIVO"
