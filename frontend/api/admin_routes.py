@@ -151,6 +151,7 @@ def get_all_members(db: Session = Depends(get_db)):
         for m in members:
             # Convert to dict first to avoid Pydantic mutability constraints
             m_dict = schemas.MemberSchema.from_orm(m).dict()
+            m_dict["password"] = ""
             m_dict["billing_history"] = [
                 {
                     "id": p.id,
@@ -190,14 +191,19 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     if not data.get('joined_at'):
         data['joined_at'] = datetime.datetime.utcnow()
     if data.get('password'):
-        data['password'] = hash_password(data['password'])
+        if not data['password'].startswith("pbkdf2:"):
+            data['password'] = hash_password(data['password'])
+    else:
+        data['password'] = hash_password("123")
     db_member = models.Member(**data)
     db.add(db_member)
     try:
         db.commit()
         db.refresh(db_member)
         print(f"Member created successfully with ID {db_member.id}")
-        return db_member
+        m_dict = schemas.MemberSchema.from_orm(db_member).dict()
+        m_dict["password"] = ""
+        return m_dict
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado).")
@@ -282,7 +288,9 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
     try:
         db.commit()
         db.refresh(db_member)
-        return db_member
+        m_dict = schemas.MemberSchema.from_orm(db_member).dict()
+        m_dict["password"] = ""
+        return m_dict
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Error de datos duplicados (el DNI o Correo ya se encuentra registrado en otro socio).")
@@ -1316,18 +1324,28 @@ def get_finance_summary(db: Session = Depends(get_db)):
 @router.get("/staff", response_model=List[schemas.StaffSchema])
 def get_all_staff(db: Session = Depends(get_db)):
     staff = db.query(models.Staff).all()
-    return staff
+    result = []
+    for s in staff:
+        s_dict = schemas.StaffSchema.from_orm(s).dict()
+        s_dict["password"] = ""
+        result.append(s_dict)
+    return result
 
 @router.post("/staff", response_model=schemas.StaffSchema)
 def create_staff(staff: schemas.StaffCreate, db: Session = Depends(get_db)):
     data = staff.dict()
     if data.get("password"):
-        data["password"] = hash_password(data["password"])
+        if not data["password"].startswith("pbkdf2:"):
+            data["password"] = hash_password(data["password"])
+    else:
+        data["password"] = hash_password("1234")
     db_staff = models.Staff(**data)
     db.add(db_staff)
     db.commit()
     db.refresh(db_staff)
-    return db_staff
+    s_dict = schemas.StaffSchema.from_orm(db_staff).dict()
+    s_dict["password"] = ""
+    return s_dict
 
 @router.put("/staff/{staff_id}", response_model=schemas.StaffSchema)
 def update_staff(staff_id: int, staff_data: schemas.StaffCreate, db: Session = Depends(get_db)):
@@ -1344,7 +1362,9 @@ def update_staff(staff_id: int, staff_data: schemas.StaffCreate, db: Session = D
     
     db.commit()
     db.refresh(db_staff)
-    return db_staff
+    s_dict = schemas.StaffSchema.from_orm(db_staff).dict()
+    s_dict["password"] = ""
+    return s_dict
 
 @router.delete("/staff/{staff_id}")
 def delete_staff(staff_id: int, db: Session = Depends(get_db)):

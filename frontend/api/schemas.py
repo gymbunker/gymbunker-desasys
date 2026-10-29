@@ -36,7 +36,7 @@ class MemberBase(BaseModel):
     status: str = "ACTIVO"
     photo_url: Optional[str] = None
     phone: Optional[str] = None
-    password: Optional[str] = "123"
+    password: Optional[str] = None
     membership_type: Optional[str] = None
     additional_plans: Optional[List[str]] = []
     wellness_data: Optional[Dict] = None
@@ -54,7 +54,7 @@ class MemberCreate(BaseModel):
     status: str = "ACTIVO"
     photo_url: Optional[str] = None
     phone: Optional[str] = None
-    password: Optional[str] = "123"
+    password: Optional[str] = None
     membership_type: Optional[str] = None
     additional_plans: Optional[List[str]] = []
     joined_at: Optional[datetime] = None
@@ -180,7 +180,7 @@ class StaffBase(BaseModel):
     username: Optional[str] = None
     role: str
     shift: Optional[str] = "Mañana"
-    password: Optional[str] = "1234"
+    password: Optional[str] = None
 
 class StaffCreate(StaffBase):
     pass

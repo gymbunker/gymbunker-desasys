@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Paperclip, Upload, ExternalLink, Trash2, Check, Loader2 } from 'lucide-react';
+import { X, Save, Paperclip, Upload, ExternalLink, Trash2, Check, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import ProgressChart from './ProgressChart';
 
 export default function MemberModal({ member, plans, API_URL, onSave, onClose }: any) {
   const [activeTab, setActiveTab] = useState<'datos' | 'entrenamiento' | 'progreso'>('datos');
   const [formData, setFormData] = useState(member);
+  const [showPassword, setShowPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
   
   // Entrenamiento State
   const [routine, setRoutine] = useState<any[]>(member?.routine || []);
@@ -172,8 +175,19 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
   };
 
   const handleSaveInternal = () => {
+    const cleanFormData = { ...formData };
+    if (passwordTouched && newPassword.trim()) {
+      cleanFormData.password = newPassword.trim();
+    } else if (cleanFormData.id) {
+      // Editing existing member: do not overwrite password
+      delete cleanFormData.password;
+    } else {
+      // New member
+      cleanFormData.password = newPassword.trim() || '123';
+    }
+
     onSave({ 
-      ...formData, 
+      ...cleanFormData, 
       training_plan_id: assignedPlanId,
       routine,
       routine_documents: routineDocuments
@@ -316,9 +330,43 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Contraseña de Acceso</label>
-                <input type="text" placeholder="Asignar Contraseña" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between ml-2">
+                  <label className="text-[9px] text-gray-500 dark:text-white/40 uppercase font-black flex items-center gap-1.5">
+                    <Lock size={12} className="text-orange-500" />
+                    Contraseña de Acceso
+                  </label>
+                  {member?.id && (
+                    <span className="text-[8px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      Cifrada en BD
+                    </span>
+                  )}
+                </div>
+                <div className="relative flex items-center">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    placeholder={member?.id ? "•••••••• (Dejar en blanco para mantener la actual)" : "Asignar contraseña (por defecto: 123)"} 
+                    className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 pr-12 text-black dark:text-white text-xs outline-none focus:border-orange-500 transition-all placeholder:text-gray-400 dark:placeholder:text-white/30" 
+                    value={newPassword} 
+                    onChange={e => {
+                      setNewPassword(e.target.value);
+                      setPasswordTouched(true);
+                    }} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 p-1 text-gray-400 hover:text-gray-600 dark:text-white/40 dark:hover:text-white transition-colors"
+                    title={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="text-[8px] text-gray-400 dark:text-white/30 ml-2">
+                  {member?.id 
+                    ? "La contraseña actual está protegida y cifrada en la base de datos. Escribe aquí solo si deseas cambiarla."
+                    : "Se guardará cifrada de forma segura en la base de datos."}
+                </p>
               </div>
             </div>
           )}

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -1230,6 +1230,7 @@ export default function AdminDashboard() {
   const [modalType, setModalType] = useState<'member' | 'staff' | 'workout' | 'plan' | 'history'>('member');
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [showStaffPassword, setShowStaffPassword] = useState(false);
   const [memberCheckins, setMemberCheckins] = useState<any[]>([]);
   const [checkinStats, setCheckinStats] = useState<any>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -1683,13 +1684,14 @@ export default function AdminDashboard() {
   const handleSaveMember = async (formData: any = selectedItem) => {
     try {
       if (isEditMode) {
+        const payload = { ...formData };
+        if (!payload.password || payload.password.trim() === '' || payload.password.startsWith('pbkdf2:')) {
+          delete payload.password;
+        }
         const res = await fetch(`${API_URL}/admin/members/${formData.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            password: formData.password || '123'
-          })
+          body: JSON.stringify(payload)
         });
         if (res.ok) {
           refreshData();
@@ -1699,13 +1701,14 @@ export default function AdminDashboard() {
           return;
         }
       } else {
+        const payload = { ...formData };
         const res = await fetch(`${API_URL}/admin/members`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...formData,
-            password: '123',
-            photo_url: `https://i.pravatar.cc/300?u=${formData.dni}`
+            ...payload,
+            password: payload.password?.trim() || '123',
+            photo_url: payload.photo_url || `https://i.pravatar.cc/300?u=${payload.dni}`
           })
         });
         if (res.ok) {
@@ -1722,11 +1725,15 @@ export default function AdminDashboard() {
 
   const handleSaveStaff = async () => {
     try {
+      const payload = { ...selectedItem };
       if (isEditMode) {
+        if (!payload.password || payload.password.trim() === '' || payload.password.startsWith('pbkdf2:')) {
+          delete payload.password;
+        }
         const res = await fetch(`${API_URL}/admin/staff/${selectedItem.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(selectedItem)
+          body: JSON.stringify(payload)
         });
         if (res.ok) refreshData();
         else alert("Error al actualizar staff");
@@ -1734,7 +1741,10 @@ export default function AdminDashboard() {
         const res = await fetch(`${API_URL}/admin/staff`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(selectedItem)
+          body: JSON.stringify({
+            ...payload,
+            password: payload.password?.trim() || '1234'
+          })
         });
         if (res.ok) refreshData();
         else alert("Error al crear staff");
@@ -1901,7 +1911,7 @@ export default function AdminDashboard() {
           else { const err = await res.json().catch(() => ({})); alert(`Error al actualizar: ${err.detail || res.status}`); }
         } catch(e) { alert('Error de conexión al guardar la contraseña'); }
       }} />;
-      case 'Staff': return (userRole === 'gerente' || userRole === 'administracion') ? <StaffModule staff={staff} onEdit={(s: any) => { setSelectedItem({...s}); setIsEditMode(true); setModalType('staff'); setIsModalOpen(true); }} onDelete={(id: any) => { showConfirm("¿Eliminar empleado?", "¿Estás seguro de que deseas eliminar este empleado?", async () => { const res = await fetch(`${API_URL}/admin/staff/${id}`, {method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={() => { setSelectedItem({name:'', role:'Entrenador', shift:'Mañana', password:'1234'}); setIsEditMode(false); setModalType('staff'); setIsModalOpen(true); }} /> : <NoAccess />;
+      case 'Staff': return (userRole === 'gerente' || userRole === 'administracion') ? <StaffModule staff={staff} onEdit={(s: any) => { setSelectedItem({...s, password: ''}); setShowStaffPassword(false); setIsEditMode(true); setModalType('staff'); setIsModalOpen(true); }} onDelete={(id: any) => { showConfirm("¿Eliminar empleado?", "¿Estás seguro de que deseas eliminar este empleado?", async () => { const res = await fetch(`${API_URL}/admin/staff/${id}`, {method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={() => { setSelectedItem({name:'', username:'', role:'Entrenador', shift:'Mañana', password:'1234'}); setShowStaffPassword(false); setIsEditMode(false); setModalType('staff'); setIsModalOpen(true); }} /> : <NoAccess />;
       case 'Sistema': return (loggedUser?.id === 0 || loggedUser?.username?.toLowerCase() === 'master') ? <SystemModule API_URL={API_URL} licenseInfo={licenseInfo} onRenewLicense={async () => {
         showConfirm("Confirmar Renovación", "¿Desea marcar la licencia como AL DIA para el mes en curso?", async () => {
           try {
@@ -2195,9 +2205,40 @@ export default function AdminDashboard() {
                         <option value="Mañana">Mañana</option><option value="Tarde">Tarde</option><option value="Noche">Noche</option>
                       </select>
                     </div>
-                    <div className="space-y-1 mt-2">
-                       <label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Contraseña de Acceso</label>
-                       <input type="text" placeholder="Contraseña..." className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs" value={selectedItem?.password || ''} onChange={e => setSelectedItem({...selectedItem, password: e.target.value})} />
+                    <div className="space-y-1.5 mt-2">
+                       <div className="flex items-center justify-between ml-2">
+                         <label className="text-[8px] text-gray-500 dark:text-white/40 uppercase font-black flex items-center gap-1.5">
+                           <Lock size={12} className="text-orange-500" />
+                           Contraseña de Acceso
+                         </label>
+                         {isEditMode && (
+                           <span className="text-[8px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                             Cifrada en BD
+                           </span>
+                         )}
+                       </div>
+                       <div className="relative flex items-center">
+                         <input 
+                           type={showStaffPassword ? "text" : "password"} 
+                           placeholder={isEditMode ? "•••••••• (Dejar en blanco para mantener la actual)" : "Asignar contraseña (por defecto: 1234)"} 
+                           className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 pr-12 text-black dark:text-white text-xs outline-none focus:border-orange-500 transition-all placeholder:text-gray-400 dark:placeholder:text-white/30" 
+                           value={selectedItem?.password || ''} 
+                           onChange={e => setSelectedItem({...selectedItem, password: e.target.value})} 
+                         />
+                         <button
+                           type="button"
+                           onClick={() => setShowStaffPassword(!showStaffPassword)}
+                           className="absolute right-4 p-1 text-gray-400 hover:text-gray-600 dark:text-white/40 dark:hover:text-white transition-colors"
+                           title={showStaffPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                         >
+                           {showStaffPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                         </button>
+                       </div>
+                       <p className="text-[8px] text-gray-400 dark:text-white/30 ml-2">
+                         {isEditMode 
+                           ? "La contraseña actual está protegida y cifrada en la base de datos. Escribe aquí solo si deseas cambiarla."
+                           : "Se guardará cifrada de forma segura en la base de datos."}
+                       </p>
                     </div>
                   </div>
                 )}
