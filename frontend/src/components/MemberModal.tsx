@@ -2,12 +2,64 @@ import { useState, useEffect } from 'react';
 import { X, Save, Paperclip, Upload, ExternalLink, Trash2, Check, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import ProgressChart from './ProgressChart';
 
+// Helper to get local date in Argentina (America/Argentina/Buenos_Aires, UTC-3)
+const getArgentinaDateString = (d: Date = new Date()): string => {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(d);
+  } catch (e) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+};
+
+// Calculate the same day of the next month safely handling varying month lengths
+const addOneMonthSameDay = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return '';
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return '';
+
+  let targetYear = y;
+  let targetMonth = m + 1;
+  if (targetMonth > 12) {
+    targetMonth = 1;
+    targetYear += 1;
+  }
+  const daysInTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+  const targetDay = Math.min(d, daysInTargetMonth);
+
+  return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+};
+
 export default function MemberModal({ member, plans, API_URL, onSave, onClose }: any) {
   const [activeTab, setActiveTab] = useState<'datos' | 'entrenamiento' | 'progreso'>('datos');
-  const [formData, setFormData] = useState(() => ({
-    ...member,
-    is_new: member?.id ? !!member.is_new : true
-  }));
+  const [formData, setFormData] = useState(() => {
+    const isNew = !member?.id;
+    const today = getArgentinaDateString();
+    const nextMonth = addOneMonthSameDay(today);
+    const dayOfMonth = parseInt(today.split('-')[2], 10);
+
+    return {
+      ...member,
+      is_new: member?.id ? !!member.is_new : true,
+      joined_at: member?.joined_at || (isNew ? `${today}T00:00:00` : null),
+      next_due_date: member?.next_due_date || (isNew ? `${nextMonth}T00:00:00` : null),
+      keep_billing_day: isNew ? true : Boolean(member?.keep_billing_day),
+      fixed_billing_day: member?.fixed_billing_day ?? (isNew ? dayOfMonth : null),
+    };
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordTouched, setPasswordTouched] = useState(false);
@@ -326,7 +378,26 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
 
               <div className="space-y-1">
                 <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Fecha de Inicio del Plan</label>
-                <input type="date" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.joined_at ? formData.joined_at.split('T')[0] : ''} onChange={e => setFormData({...formData, joined_at: e.target.value ? e.target.value + 'T00:00:00' : null})} />
+                <input 
+                  type="date" 
+                  className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" 
+                  value={formData?.joined_at ? formData.joined_at.split('T')[0] : ''} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!val) {
+                      setFormData({ ...formData, joined_at: null });
+                      return;
+                    }
+                    const nextDue = addOneMonthSameDay(val);
+                    const day = parseInt(val.split('-')[2], 10);
+                    setFormData({
+                      ...formData,
+                      joined_at: val + 'T00:00:00',
+                      next_due_date: nextDue ? nextDue + 'T00:00:00' : formData?.next_due_date,
+                      fixed_billing_day: formData?.keep_billing_day ? day : formData?.fixed_billing_day
+                    });
+                  }} 
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -342,7 +413,7 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
                       setFormData({
                         ...formData, 
                         next_due_date: val ? val + 'T00:00:00' : null,
-                        fixed_billing_day: formData?.keep_billing_day ? (formData?.fixed_billing_day || day) : formData?.fixed_billing_day
+                        fixed_billing_day: formData?.keep_billing_day ? (day ?? formData?.fixed_billing_day) : formData?.fixed_billing_day
                       });
                     }} 
                   />
@@ -355,8 +426,12 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
                       onChange={e => {
                         const checked = e.target.checked;
                         let fixedDay = formData?.fixed_billing_day;
-                        if (checked && !fixedDay && formData?.next_due_date) {
-                          fixedDay = parseInt(formData.next_due_date.split('T')[0].split('-')[2], 10);
+                        if (checked && !fixedDay) {
+                          if (formData?.joined_at) {
+                            fixedDay = parseInt(formData.joined_at.split('T')[0].split('-')[2], 10);
+                          } else if (formData?.next_due_date) {
+                            fixedDay = parseInt(formData.next_due_date.split('T')[0].split('-')[2], 10);
+                          }
                         }
                         setFormData({
                           ...formData, 

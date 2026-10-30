@@ -1732,7 +1732,14 @@ export default function AdminDashboard() {
           })
         });
         if (res.ok) {
-          refreshData();
+          const createdMember = await res.json().catch(() => null);
+          await refreshData();
+          setIsModalOpen(false);
+          if (createdMember && createdMember.id) {
+            setSelectedItem(createdMember);
+            setIsPaymentModalOpen(true);
+          }
+          return;
         } else {
           const errData = await res.json().catch(() => ({}));
           alert(errData.detail || "Error al crear socio. Verifique los datos ingresados.");
@@ -2527,36 +2534,54 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
   const currentMainPrice = getPriceForPlan(mainPlanObj, method);
   const isCustomMain = Boolean(mainPlanObj?.enable_custom_payment_methods && ((method === 'Efectivo' && mainPlanObj?.price_cash != null) || (method === 'Transferencia' && mainPlanObj?.price_transfer != null)));
 
-  // Fecha de cobro actual (por defecto día de hoy / current_day)
-  const today = new Date();
-  const currentDayNum = today.getDate();
-  const [billingDate, setBillingDate] = useState(() => today.toISOString().split('T')[0]);
+  // Fecha de cobro actual (por defecto día de hoy en hora Argentina sin desfase UTC)
+  const getArgentinaDate = (): string => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+    } catch {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  };
+
+  const todayStr = getArgentinaDate();
+  const currentDayNum = parseInt(todayStr.split('-')[2], 10);
+  const [billingDate, setBillingDate] = useState(() => todayStr);
   const [billingDayNum, setBillingDayNum] = useState<number>(currentDayNum);
 
-  // Mantener día de cobro para siempre
-  const initialKeep = Boolean(member.keep_billing_day ?? member.wellness_data?.keep_billing_day);
-  const initialFixedDay = member.fixed_billing_day ?? member.wellness_data?.fixed_billing_day ?? currentDayNum;
-  const [keepBillingDay, setKeepBillingDay] = useState<boolean>(initialKeep);
+  // Mantener día de cobro para siempre: siempre activado por defecto para todos los socios al cobrar
+  const memberFixedDay = member?.fixed_billing_day ?? member?.wellness_data?.fixed_billing_day;
+  const initialFixedDay = memberFixedDay ?? (member?.next_due_date ? parseInt(member.next_due_date.split('T')[0].split('-')[2], 10) : currentDayNum);
+  const [keepBillingDay, setKeepBillingDay] = useState<boolean>(true);
   const [fixedBillingDay, setFixedBillingDay] = useState<number>(initialFixedDay);
 
   // Calcular Próximo Cobro por defecto
-  const computeDefaultNextDue = (fixedDay: number, keep: boolean) => {
-    const base = new Date();
-    let targetMonth = base.getMonth() + 1;
-    let targetYear = base.getFullYear();
-    if (targetMonth > 11) {
-      targetMonth = 0;
+  const computeDefaultNextDue = (fixedDay: number, keep: boolean, baseDateStr?: string) => {
+    const base = baseDateStr ? baseDateStr.split('T')[0] : todayStr;
+    const parts = base.split('-');
+    const baseYear = parseInt(parts[0], 10);
+    const baseMonth = parseInt(parts[1], 10);
+    const baseDay = parseInt(parts[2], 10);
+
+    let targetMonth = baseMonth + 1;
+    let targetYear = baseYear;
+    if (targetMonth > 12) {
+      targetMonth = 1;
       targetYear += 1;
     }
-    const dayToUse = keep ? fixedDay : base.getDate();
-    const maxDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+    const dayToUse = keep ? fixedDay : baseDay;
+    const maxDays = new Date(targetYear, targetMonth, 0).getDate();
     const finalDay = Math.min(dayToUse, maxDays);
-    const d = new Date(targetYear, targetMonth, finalDay);
-    return d.toISOString().split('T')[0];
+    return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(finalDay).padStart(2, '0')}`;
   };
 
   const [nextDueDate, setNextDueDate] = useState<string>(() => {
-    return computeDefaultNextDue(initialFixedDay, initialKeep);
+    return computeDefaultNextDue(initialFixedDay, true, todayStr);
   });
 
   return (
@@ -2669,12 +2694,12 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
                     const val = e.target.value;
                     setBillingDate(val);
                     if (val) {
-                      const d = new Date(val + 'T00:00:00').getDate();
+                      const d = parseInt(val.split('-')[2], 10);
                       setBillingDayNum(d);
-                      if (!keepBillingDay) {
-                        const nextD = new Date(val + 'T00:00:00');
-                        nextD.setMonth(nextD.getMonth() + 1);
-                        setNextDueDate(nextD.toISOString().split('T')[0]);
+                      if (keepBillingDay) {
+                        setNextDueDate(computeDefaultNextDue(fixedBillingDay, true, val));
+                      } else {
+                        setNextDueDate(computeDefaultNextDue(d, false, val));
                       }
                     }
                   }}
@@ -2688,7 +2713,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
                     Próximo Cobro
                   </span>
                   <span className="text-[8px] font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">
-                    Vence día {nextDueDate ? new Date(nextDueDate + 'T00:00:00').getDate() : '—'}
+                    Vence día {nextDueDate ? parseInt(nextDueDate.split('-')[2], 10) : '—'}
                   </span>
                 </div>
                 <input 
@@ -2699,7 +2724,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
                     const val = e.target.value;
                     setNextDueDate(val);
                     if (val && keepBillingDay) {
-                      const d = new Date(val + 'T00:00:00').getDate();
+                      const d = parseInt(val.split('-')[2], 10);
                       setFixedBillingDay(d);
                     }
                   }}
@@ -2716,7 +2741,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
                   const checked = e.target.checked;
                   setKeepBillingDay(checked);
                   if (checked) {
-                    const d = nextDueDate ? new Date(nextDueDate + 'T00:00:00').getDate() : billingDayNum;
+                    const d = nextDueDate ? parseInt(nextDueDate.split('-')[2], 10) : billingDayNum;
                     setFixedBillingDay(d);
                   }
                 }}
