@@ -2955,17 +2955,19 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
     }
   };
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59);
+  const sStr = startDate;
+  const eStr = endDate;
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T23:59:59');
 
   // Billing history in period
   const allHistory = (members || []).flatMap((m: any) => 
     (m.billing_history || []).map((h: any) => ({ ...h, userName: m.name, member_id: m.id }))
   );
   const filteredHistory = allHistory.filter((h: any) => {
-    const d = new Date(h.date);
-    return d >= start && d <= end;
+    if (!h.date) return false;
+    const dStr = String(h.date).split('T')[0];
+    return dStr >= sStr && dStr <= eStr;
   });
   const totalPeriodRevenue = filteredHistory.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
 
@@ -2973,8 +2975,8 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
   const newMembersInPeriod = (members || []).filter((m: any) => {
     if (!m.is_new) return false;
     if (!m.joined_at) return true;
-    const jd = new Date(m.joined_at);
-    return jd >= start && jd <= end;
+    const mDate = String(m.joined_at).split('T')[0];
+    return mDate >= sStr && mDate <= eStr;
   });
 
   const activeCount = (members || []).filter((m: any) => m.status === 'ACTIVO' || m.status === 'AL DIA').length;
@@ -3660,13 +3662,15 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
   if (!data) return <p>Cargando...</p>;
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59);
+  const sStr = startDate;
+  const eStr = endDate;
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T23:59:59');
   
   const filteredHistory = (data.all_history || []).filter((h: any) => {
-    const d = new Date(h.date);
-    return d >= start && d <= end;
+    if (!h.date) return false;
+    const dStr = String(h.date).split('T')[0];
+    return dStr >= sStr && dStr <= eStr;
   });
 
   const revenueByPlan: { [key: string]: number } = {};
@@ -3721,8 +3725,8 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
   const newMembers = (members || []).filter((m: any) => {
     if (!m.is_new) return false;
     if (!m.joined_at) return true;
-    const jd = new Date(m.joined_at);
-    return jd >= start && jd <= end;
+    const mDate = String(m.joined_at).split('T')[0];
+    return mDate >= sStr && mDate <= eStr;
   });
 
 
