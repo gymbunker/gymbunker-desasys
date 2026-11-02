@@ -29,6 +29,36 @@ let currentQRDataUrl = null;
 let connectedUser = null;
 let isConnecting = false;
 const messageStore = new Map();
+const CACHE_FILE = path.join(AUTH_DIR, 'messages_cache.json');
+
+function loadMessageCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+      for (const [k, v] of Object.entries(data)) {
+        messageStore.set(k, v);
+      }
+      console.log(`[WHATSAPP CACHE] Cargados ${messageStore.size} mensajes previos para reintentos de descifrado.`);
+    }
+  } catch (e) {
+    console.error('[WHATSAPP CACHE] Error cargando cache de mensajes:', e);
+  }
+}
+
+function saveMessageCache() {
+  try {
+    if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+    const obj = {};
+    // Mantener solo los ultimos 200 mensajes en disco
+    const entries = Array.from(messageStore.entries()).slice(-200);
+    for (const [k, v] of entries) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj));
+  } catch (e) {}
+}
+
+loadMessageCache();
 
 async function startWhatsApp() {
   if (isConnecting) return;
@@ -250,6 +280,7 @@ app.post('/send', authenticate, async (req, res) => {
         const firstKey = messageStore.keys().next().value;
         messageStore.delete(firstKey);
       }
+      saveMessageCache();
     }
 
     console.log(`[WHATSAPP SENT] Mensaje entregado con ID: ${sent.key.id}`);

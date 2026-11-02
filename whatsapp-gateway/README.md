@@ -20,6 +20,9 @@ Microservicio autónomo para envíos automáticos de WhatsApp con Node.js, Baile
 
 ## 🛠️ Scripts Incluidos
 
+* **`ACTIVAR_WHATSAPP_SEGUNDO_PLANO.bat`**: Inicia el servicio en segundo plano (invisible) y abre el panel en el navegador. Podés cerrar la ventana inmediatamente y el servicio sigue funcionando.
+* **`CREAR_ACCESO_DIRECTO_ESCRITORIO.bat`**: Crea con 1 clic los accesos directos en el Escritorio de Windows.
+* **`REPARAR_SESION_WHATSAPP.bat`**: Resuelve el error de "Esperando el mensaje" limpiando claves desincronizadas y generando un QR nuevo.
 * **`CONFIGURAR_ESTA_COMPUTADORA.bat`**: Asistente de instalación completa en 1 clic.
 * **`start_silent.vbs`**: Inicia el servicio en segundo plano (completamente invisible, sin ventanas de consola).
 * **`iniciar_whatsapp.bat`**: Inicia el servicio con ventana de consola visible (ideal para pruebas y ver logs en vivo).
