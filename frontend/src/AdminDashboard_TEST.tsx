@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, Calendar, Clock, Menu, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, Smartphone, Banknote, Search, Moon, Sun, Calendar, Clock, Menu, AlertTriangle, QrCode } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -745,9 +745,9 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
             <label className="text-[9px] text-gray-500 dark:text-white/20 uppercase font-black ml-4">Método de Pago</label>
             <div className="grid grid-cols-2 gap-2">
                <PaymentBtn active={method === 'Efectivo'} onClick={()=>setMethod('Efectivo')} label="Efectivo" icon={<Banknote size={16}/>} />
-               <PaymentBtn active={method === 'Tarjeta'} onClick={()=>setMethod('Tarjeta')} label="Tarjeta" icon={<CreditCard size={16}/>} />
+               <PaymentBtn active={method === 'MP JAVI'} onClick={()=>setMethod('MP JAVI')} label="MP JAVI" icon={<QrCode size={16}/>} />
                <PaymentBtn active={method === 'Transferencia'} onClick={()=>setMethod('Transferencia')} label="Transferencia" icon={<Smartphone size={16}/>} />
-               <PaymentBtn active={method === 'QR'} onClick={()=>setMethod('QR')} label="QR" icon={<Smartphone size={16}/>} />
+               <PaymentBtn active={method === 'MP LUCIANO'} onClick={()=>setMethod('MP LUCIANO')} label="MP LUCIANO" icon={<QrCode size={16}/>} />
             </div>
          </div>
 

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, CreditCard, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles, QrCode } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -2272,7 +2272,7 @@ export default function AdminDashboard() {
                             <p className="text-[10px] font-black uppercase text-orange-500">Diferenciar precios por método de pago</p>
                           </div>
                           <p className="text-[8px] text-gray-500 dark:text-white/40 leading-tight">
-                            Habilita tarifas diferenciadas para cobros en Efectivo o Transferencia.
+                            Habilita tarifas diferenciadas para cobros en Efectivo o Transferencia / Mercado Pago.
                           </p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -2320,13 +2320,13 @@ export default function AdminDashboard() {
                             <div className="space-y-1 bg-white dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-white/10">
                               <label className="text-[9px] text-cyan-400 uppercase font-black flex items-center gap-1.5">
                                 <Smartphone size={13} />
-                                Cobro por Transferencia
+                                Cobro por Transf. / MP
                               </label>
                               <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">$</span>
                                 <input 
                                   type="number" 
-                                  placeholder="Monto transferencia..."
+                                  placeholder="Monto transferencia o MP..."
                                   className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg py-2 pl-7 pr-3 text-black dark:text-white text-xs font-bold outline-none focus:border-cyan-400"
                                   value={selectedItem?.price_transfer ?? ''} 
                                   onChange={e => setSelectedItem({ ...selectedItem, price_transfer: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })} 
@@ -2335,7 +2335,7 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <p className="text-[8px] text-gray-400 dark:text-white/40 italic">
-                            💡 Al cobrar la cuota a un socio, el monto sugerido se adaptará de acuerdo a si elegís Efectivo o Transferencia.
+                            💡 Al cobrar la cuota a un socio, el monto sugerido se adaptará de acuerdo a si elegís Efectivo o Medios Digitales (Transferencia, MP JAVI, MP LUCIANO).
                           </p>
                         </div>
                       )}
@@ -2505,13 +2505,15 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
   const addPlansList: string[] = member.additional_plans || [];
   const addPlanObjs = addPlansList.map(n => plans.find((p:any) => p.name === n)).filter(Boolean);
 
+  const isTransferOrDigital = (m: string) => ['Transferencia', 'MP JAVI', 'MP LUCIANO'].includes(m);
+
   const getPriceForPlan = (plan: any, currentMethod: string) => {
     if (!plan) return 0;
     if (plan.enable_custom_payment_methods) {
       if (currentMethod === 'Efectivo' && plan.price_cash != null && plan.price_cash !== '') {
         return Number(plan.price_cash);
       }
-      if (currentMethod === 'Transferencia' && plan.price_transfer != null && plan.price_transfer !== '') {
+      if (isTransferOrDigital(currentMethod) && plan.price_transfer != null && plan.price_transfer !== '') {
         return Number(plan.price_transfer);
       }
     }
@@ -2532,7 +2534,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
   };
 
   const currentMainPrice = getPriceForPlan(mainPlanObj, method);
-  const isCustomMain = Boolean(mainPlanObj?.enable_custom_payment_methods && ((method === 'Efectivo' && mainPlanObj?.price_cash != null) || (method === 'Transferencia' && mainPlanObj?.price_transfer != null)));
+  const isCustomMain = Boolean(mainPlanObj?.enable_custom_payment_methods && ((method === 'Efectivo' && mainPlanObj?.price_cash != null) || (isTransferOrDigital(method) && mainPlanObj?.price_transfer != null)));
 
   // Fecha de cobro actual (por defecto día de hoy en hora Argentina sin desfase UTC)
   const getArgentinaDate = (): string => {
@@ -2616,7 +2618,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
             </div>
             {addPlanObjs.map((ap: any, i: number) => {
               const apPrice = getPriceForPlan(ap, method);
-              const isCustomAp = Boolean(ap?.enable_custom_payment_methods && ((method === 'Efectivo' && ap?.price_cash != null) || (method === 'Transferencia' && ap?.price_transfer != null)));
+              const isCustomAp = Boolean(ap?.enable_custom_payment_methods && ((method === 'Efectivo' && ap?.price_cash != null) || (isTransferOrDigital(method) && ap?.price_transfer != null)));
               return (
                 <div key={i} className="flex justify-between items-center text-xs font-bold text-orange-500">
                    <span>+ {ap.name} (Adicional)</span>
@@ -2655,9 +2657,9 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
             </div>
             <div className="grid grid-cols-2 gap-2">
                <PaymentBtn active={method === 'Efectivo'} onClick={()=>handleSelectMethod('Efectivo')} label="Efectivo" icon={<Banknote size={15}/>} />
-               <PaymentBtn active={method === 'Tarjeta'} onClick={()=>handleSelectMethod('Tarjeta')} label="Tarjeta" icon={<CreditCard size={15}/>} />
+               <PaymentBtn active={method === 'MP JAVI'} onClick={()=>handleSelectMethod('MP JAVI')} label="MP JAVI" icon={<QrCode size={15}/>} />
                <PaymentBtn active={method === 'Transferencia'} onClick={()=>handleSelectMethod('Transferencia')} label="Transferencia" icon={<Smartphone size={15}/>} />
-               <PaymentBtn active={method === 'QR'} onClick={()=>handleSelectMethod('QR')} label="QR" icon={<Smartphone size={15}/>} />
+               <PaymentBtn active={method === 'MP LUCIANO'} onClick={()=>handleSelectMethod('MP LUCIANO')} label="MP LUCIANO" icon={<QrCode size={15}/>} />
             </div>
          </div>
 
@@ -2787,8 +2789,15 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
 
 function PaymentBtn({ active, onClick, label, icon }: any) {
   return (
-    <button onClick={onClick} className={`flex items-center justify-center gap-3 p-4 rounded-xl border transition-all ${active ? 'bg-green-600 border-green-400 text-black dark:text-white shadow-lg' : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/20 hover:text-black dark:text-white'}`}>
-       {icon}<span className="text-[10px] font-black uppercase">{label}</span>
+    <button 
+      onClick={onClick} 
+      className={`flex items-center justify-center gap-2 p-3.5 rounded-xl border transition-all ${
+        active 
+          ? 'bg-green-600 border-green-400 text-white shadow-lg shadow-green-600/30' 
+          : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-black dark:hover:text-white'
+      }`}
+    >
+       {icon}<span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
     </button>
   );
 }
@@ -3546,7 +3555,7 @@ function PlansModule({ plans, onEdit, onDelete, onAddClick }: any) {
             </h3>
           </div>
           <p className="text-[10px] text-gray-500 dark:text-white/40 font-bold">
-            Administrá las tarifas del gimnasio y configurá montos diferenciados para Efectivo o Transferencia.
+            Administrá las tarifas del gimnasio y configurá montos diferenciados para Efectivo o Transferencia / MP.
           </p>
         </div>
         <button 
@@ -3612,7 +3621,7 @@ function PlansModule({ plans, onEdit, onDelete, onAddClick }: any) {
                       </div>
                       <div className="bg-white/60 dark:bg-black/30 p-2 rounded-xl border border-gray-200/50 dark:border-white/5">
                         <p className="text-[7px] font-black uppercase text-cyan-400 flex items-center gap-1">
-                          <Smartphone size={10} /> Transf.
+                          <Smartphone size={10} /> Transf. / MP
                         </p>
                         <p className="text-xs font-black text-black dark:text-white mt-0.5">
                           ${p.price_transfer != null ? Number(p.price_transfer).toLocaleString() : Number(p.price).toLocaleString()}
