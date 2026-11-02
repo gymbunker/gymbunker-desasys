@@ -1234,6 +1234,7 @@ export default function AdminDashboard() {
   const [memberCheckins, setMemberCheckins] = useState<any[]>([]);
   const [checkinStats, setCheckinStats] = useState<any>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isSavingGenericModal, setIsSavingGenericModal] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [systemAnnouncement, setSystemAnnouncement] = useState<any>(null);
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
@@ -1715,11 +1716,12 @@ export default function AdminDashboard() {
           body: JSON.stringify(payload)
         });
         if (res.ok) {
-          refreshData();
+          await refreshData();
+          setIsModalOpen(false);
         } else {
           const errData = await res.json().catch(() => ({}));
           alert(errData.detail || "Error al actualizar socio");
-          return;
+          throw new Error(errData.detail || "Error al actualizar socio");
         }
       } else {
         const res = await fetch(`${API_URL}/admin/members`, {
@@ -1743,11 +1745,14 @@ export default function AdminDashboard() {
         } else {
           const errData = await res.json().catch(() => ({}));
           alert(errData.detail || "Error al crear socio. Verifique los datos ingresados.");
-          return;
+          throw new Error(errData.detail || "Error al crear socio");
         }
       }
       setIsModalOpen(false);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      throw e;
+    }
   };
 
   const handleSaveStaff = async () => {
@@ -1802,7 +1807,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         const pdfBase64 = await generatePaymentPDF(selectedItem, amount, method, staffName, billingDate, nextDueDate);
         setIsPaymentModalOpen(false);
-        refreshData();
+        await refreshData();
 
         // Enviar comprobante automáticamente por Correo (con PDF adjunto y diseño institucional) y WhatsApp en segundo plano
         const contractedPlansStr = [selectedItem.membership_type || 'Musculación', ...(selectedItem.additional_plans || [])].join(' + ');
@@ -1818,8 +1823,15 @@ export default function AdminDashboard() {
             pdf_base64: pdfBase64 || ''
           })
         }).catch(err => console.warn('[AUTO-RECEIPT] Error enviando comprobante en segundo plano:', err));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Error al procesar el pago");
+        throw new Error(err.detail || "Error al procesar el pago");
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      throw e;
+    }
   };
 
   const generatePaymentPDF = async (member: any, amount: number, method: string, staffName: string, customDate?: string, nextDueDate?: string): Promise<string> => {
@@ -2403,7 +2415,34 @@ export default function AdminDashboard() {
                 )}
               </div>
               {modalType !== 'history' && (
-                <div className="flex gap-4 mt-8 border-t border-gray-200 dark:border-white/5 pt-6"><button className="flex-1 py-3 text-gray-600 dark:text-white/40 font-black uppercase text-[10px]" onClick={() => setIsModalOpen(false)}>Cancelar</button><button className="flex-1 py-3 bg-orange-500 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-orange-500/20" onClick={() => { if(modalType==='plan') handleSavePlan(); else if(modalType==='staff') handleSaveStaff(); }}>Guardar</button></div>
+                <div className="flex gap-4 mt-8 border-t border-gray-200 dark:border-white/5 pt-6">
+                  <button disabled={isSavingGenericModal} className="flex-1 py-3 text-gray-600 dark:text-white/40 font-black uppercase text-[10px] disabled:opacity-50" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+                  <button 
+                    disabled={isSavingGenericModal}
+                    className="flex-1 py-3 bg-orange-500 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-orange-500/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
+                    onClick={async () => { 
+                      if (isSavingGenericModal) return;
+                      setIsSavingGenericModal(true);
+                      try {
+                        if (modalType === 'plan') await handleSavePlan(); 
+                        else if (modalType === 'staff') await handleSaveStaff(); 
+                      } catch (err) {
+                        console.error(err);
+                      } finally {
+                        setIsSavingGenericModal(false);
+                      }
+                    }}
+                  >
+                    {isSavingGenericModal ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                        <span>Guardando...</span>
+                      </>
+                    ) : (
+                      <span>Guardar</span>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -2500,6 +2539,7 @@ export default function AdminDashboard() {
 
 function PaymentModal({ plans, member, onPay, onClose }: any) {
   const [method, setMethod] = useState('Efectivo');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   const mainPlanObj = plans.find((p:any) => member.membership_type && p.name.toLowerCase().includes(member.membership_type.toLowerCase())) || plans[0];
   const addPlansList: string[] = member.additional_plans || [];
@@ -2771,16 +2811,34 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
       {/* Footer fijo con botones de acción */}
       <div className="flex gap-3 pt-3 mt-3 border-t border-gray-200 dark:border-white/10 shrink-0">
         <button 
-          className="flex-1 py-3 text-gray-600 dark:text-white/40 font-black uppercase text-[10px] hover:text-black dark:hover:text-white transition-colors" 
+          className="flex-1 py-3 text-gray-600 dark:text-white/40 font-black uppercase text-[10px] hover:text-black dark:hover:text-white transition-colors disabled:opacity-50" 
           onClick={onClose}
+          disabled={isProcessingPayment}
         >
           Cancelar
         </button>
         <button 
-          className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase text-[10px] shadow-lg shadow-green-600/30 transition-all hover:scale-[1.02]" 
-          onClick={()=>onPay(amount, method, billingDate, nextDueDate, keepBillingDay, fixedBillingDay)}
+          disabled={isProcessingPayment}
+          className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase text-[10px] shadow-lg shadow-green-600/30 transition-all hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
+          onClick={async () => {
+            if (isProcessingPayment) return;
+            setIsProcessingPayment(true);
+            try {
+              await onPay(amount, method, billingDate, nextDueDate, keepBillingDay, fixedBillingDay);
+            } catch (err) {
+              console.error(err);
+              setIsProcessingPayment(false);
+            }
+          }}
         >
-          Generar Pago
+          {isProcessingPayment ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+              <span>Generando Cobro...</span>
+            </>
+          ) : (
+            <span>Generar Pago</span>
+          )}
         </button>
       </div>
     </div>

@@ -730,6 +730,8 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
   const planObj = plans.find((p:any) => member.membership_type && p.name.toLowerCase().includes(member.membership_type.toLowerCase())) || plans[0];
   const [amount, setAmount] = useState(planObj?.price || 0);
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   return (
     <div className="bg-white dark:bg-[#1b2435] border border-gray-200 dark:border-white/10 p-10 rounded-[40px] w-full max-w-md shadow-3xl animate-in zoom-in duration-300">
       <h2 className="text-xl font-black mb-2 uppercase tracking-widest text-green-500 text-center">Facturación en Recepción</h2>
@@ -751,7 +753,31 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
             </div>
          </div>
 
-         <div className="flex gap-4 pt-4 border-t border-gray-200 dark:border-white/5"><button className="flex-1 py-4 text-gray-600 dark:text-white/40 font-black uppercase text-[10px]" onClick={onClose}>Cancelar</button><button className="flex-1 py-4 bg-[#0a0a0a] dark:bg-[#F38E26] text-white dark:text-[#0a0a0a] border border-[#F38E26] rounded-2xl font-black uppercase text-[10px]" onClick={()=>onPay(amount, method)}>Generar Pago</button></div>
+         <div className="flex gap-4 pt-4 border-t border-gray-200 dark:border-white/5">
+           <button disabled={isProcessing} className="flex-1 py-4 text-gray-600 dark:text-white/40 font-black uppercase text-[10px] disabled:opacity-50" onClick={onClose}>Cancelar</button>
+           <button 
+             disabled={isProcessing} 
+             className="flex-1 py-4 bg-[#0a0a0a] dark:bg-[#F38E26] text-white dark:text-[#0a0a0a] border border-[#F38E26] rounded-2xl font-black uppercase text-[10px] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
+             onClick={async ()=> {
+               if (isProcessing) return;
+               setIsProcessing(true);
+               try {
+                 await onPay(amount, method);
+               } finally {
+                 setIsProcessing(false);
+               }
+             }}
+           >
+             {isProcessing ? (
+               <>
+                 <div className="w-3.5 h-3.5 border-2 border-[#F38E26] dark:border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                 <span>Generando Pago...</span>
+               </>
+             ) : (
+               <span>Generar Pago</span>
+             )}
+           </button>
+         </div>
       </div>
     </div>
   );

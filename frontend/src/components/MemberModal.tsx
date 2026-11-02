@@ -229,7 +229,10 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
     setRoutineDocuments(prev => prev.filter((_: any, i: number) => i !== idx));
   };
 
-  const handleSaveInternal = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveInternal = async () => {
+    if (isSaving) return;
     const cleanFormData = { ...formData };
     if (!cleanFormData.name || !cleanFormData.name.trim()) {
       alert("Por favor ingresá el nombre del socio.");
@@ -254,12 +257,18 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
       cleanFormData.password = newPassword.trim() || '123';
     }
 
-    onSave({ 
-      ...cleanFormData, 
-      training_plan_id: assignedPlanId,
-      routine,
-      routine_documents: routineDocuments
-    });
+    setIsSaving(true);
+    try {
+      await onSave({ 
+        ...cleanFormData, 
+        training_plan_id: assignedPlanId,
+        routine,
+        routine_documents: routineDocuments
+      });
+    } catch (err) {
+      console.error("Error al guardar socio:", err);
+      setIsSaving(false);
+    }
   };
 
   const filteredExercises = exercises.filter((e:any) => {
@@ -775,9 +784,23 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
             )}
           </div>
           <div className="flex gap-4">
-            <button onClick={onClose} className="px-6 py-3 rounded-xl text-xs font-black uppercase text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Cancelar</button>
-            <button onClick={handleSaveInternal} className="px-8 py-3 bg-orange-500 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
-              <Save size={16} /> Guardar Socio
+            <button onClick={onClose} disabled={isSaving} className="px-6 py-3 rounded-xl text-xs font-black uppercase text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50">Cancelar</button>
+            <button 
+              onClick={handleSaveInternal} 
+              disabled={isSaving}
+              className="px-8 py-3 bg-orange-500 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Guardando...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  <span>Guardar Socio</span>
+                </>
+              )}
             </button>
           </div>
         </div>
