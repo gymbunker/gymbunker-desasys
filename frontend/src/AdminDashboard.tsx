@@ -2827,13 +2827,13 @@ function BillingModule({ members, onDeletePayment }: any) {
 
   const allHistory = members.flatMap((m:any) => (m.billing_history || []).map((h:any) => ({...h, userName: m.name})));
   
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59);
+  const sStr = startDate;
+  const eStr = endDate;
 
   const filteredHistory = allHistory.filter((h:any) => {
-    const d = new Date(h.date);
-    return d >= start && d <= end;
+    if (!h.date) return false;
+    const dStr = String(h.date).split('T')[0].split(' ')[0];
+    return dStr >= sStr && dStr <= eStr;
   });
 
   const sorted = filteredHistory.sort((a:any, b:any) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -2868,6 +2868,14 @@ function BillingModule({ members, onDeletePayment }: any) {
           <div className="bg-white dark:bg-white/5 p-6 rounded-2xl border border-gray-200 dark:border-white/5"><p className="text-[9px] font-black text-gray-500 dark:text-white/20 uppercase">Más Usado</p><p className="text-xl font-black text-orange-500 truncate" title={mostUsedPlan}>{mostUsedPlan}</p></div>
           <div className="bg-white dark:bg-white/5 p-6 rounded-2xl border border-gray-200 dark:border-white/5"><p className="text-[9px] font-black text-gray-500 dark:text-white/20 uppercase">Facturas</p><p className="text-xl font-black text-black dark:text-white">{sorted.length}</p></div>
        </div>
+
+       {/* Gráfico y métricas de Métodos de Pago */}
+       <PaymentMethodsStatsSection 
+         history={filteredHistory} 
+         startDate={startDate} 
+         endDate={endDate} 
+         filterType={filterType} 
+       />
        <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-3xl overflow-x-auto shadow-2xl">
           <table className="w-full text-left min-w-full table-fixed">
              <thead className="bg-white dark:bg-white/5 border-b border-gray-200 dark:border-white/5 text-[8px] text-gray-500 dark:text-white/20 font-black uppercase tracking-widest"><tr><th className="p-4">Socio</th><th className="p-4">Fecha</th><th className="p-4">Plan</th><th className="p-4">Método</th><th className="p-4">Cobró</th><th className="p-4 text-right">Monto</th><th className="p-4 w-10"></th></tr></thead>
@@ -2960,6 +2968,353 @@ function getCohortChartData(newMembers: any[], retainedMembers: any[], start: Da
     });
   }
   return months;
+}
+
+function PaymentMethodsStatsSection({ 
+  history, 
+  startDate, 
+  endDate, 
+  filterType 
+}: { 
+  history: any[]; 
+  startDate?: string; 
+  endDate?: string; 
+  filterType?: string; 
+}) {
+  const [metricView, setMetricView] = useState<'both' | 'revenue' | 'count'>('both');
+
+  const PRIMARY_METHODS = ['Efectivo', 'MP JAVI', 'Transferencia', 'MP LUCIANO'];
+
+  const METHOD_DETAILS: Record<string, { label: string; color: string; bgBadge: string; textBadge: string; borderBadge: string }> = {
+    'Efectivo': {
+      label: 'Efectivo',
+      color: '#10b981',
+      bgBadge: 'bg-emerald-500/10',
+      textBadge: 'text-emerald-500',
+      borderBadge: 'border-emerald-500/20'
+    },
+    'MP JAVI': {
+      label: 'MP JAVI',
+      color: '#06b6d4',
+      bgBadge: 'bg-cyan-500/10',
+      textBadge: 'text-cyan-400',
+      borderBadge: 'border-cyan-500/20'
+    },
+    'Transferencia': {
+      label: 'Transferencia',
+      color: '#3b82f6',
+      bgBadge: 'bg-blue-500/10',
+      textBadge: 'text-blue-400',
+      borderBadge: 'border-blue-500/20'
+    },
+    'MP LUCIANO': {
+      label: 'MP LUCIANO',
+      color: '#a855f7',
+      bgBadge: 'bg-purple-500/10',
+      textBadge: 'text-purple-400',
+      borderBadge: 'border-purple-500/20'
+    },
+    'Tarjeta': {
+      label: 'Tarjeta',
+      color: '#f59e0b',
+      bgBadge: 'bg-amber-500/10',
+      textBadge: 'text-amber-400',
+      borderBadge: 'border-amber-500/20'
+    },
+    'QR': {
+      label: 'QR',
+      color: '#6366f1',
+      bgBadge: 'bg-indigo-500/10',
+      textBadge: 'text-indigo-400',
+      borderBadge: 'border-indigo-500/20'
+    }
+  };
+
+  const getMethodMeta = (m: string) => {
+    return METHOD_DETAILS[m] || {
+      label: m,
+      color: '#64748b',
+      bgBadge: 'bg-gray-500/10',
+      textBadge: 'text-gray-400',
+      borderBadge: 'border-gray-500/20'
+    };
+  };
+
+  const getMethodIcon = (m: string, size = 16) => {
+    switch (m) {
+      case 'Efectivo': return <Banknote size={size} className="text-emerald-500" />;
+      case 'MP JAVI': return <QrCode size={size} className="text-cyan-400" />;
+      case 'Transferencia': return <Smartphone size={size} className="text-blue-400" />;
+      case 'MP LUCIANO': return <QrCode size={size} className="text-purple-400" />;
+      case 'Tarjeta': return <Receipt size={size} className="text-amber-400" />;
+      default: return <Receipt size={size} className="text-gray-400" />;
+    }
+  };
+
+  const statsMap: Record<string, { method: string; count: number; total: number }> = {};
+  
+  PRIMARY_METHODS.forEach(m => {
+    statsMap[m] = { method: m, count: 0, total: 0 };
+  });
+
+  (history || []).forEach((h: any) => {
+    const rawMethod = (h.method || 'Efectivo').trim();
+    if (!statsMap[rawMethod]) {
+      statsMap[rawMethod] = { method: rawMethod, count: 0, total: 0 };
+    }
+    statsMap[rawMethod].count += 1;
+    statsMap[rawMethod].total += Number(h.amount) || 0;
+  });
+
+  const totalRevenue = Object.values(statsMap).reduce((sum, item) => sum + item.total, 0);
+  const totalCount = Object.values(statsMap).reduce((sum, item) => sum + item.count, 0);
+
+  const orderedList = [
+    ...PRIMARY_METHODS.map(m => statsMap[m]),
+    ...Object.values(statsMap).filter(item => !PRIMARY_METHODS.includes(item.method) && item.count > 0)
+  ];
+
+  const chartData = orderedList.map(item => {
+    const meta = getMethodMeta(item.method);
+    const pctRev = totalRevenue > 0 ? (item.total / totalRevenue) * 100 : 0;
+    const pctCount = totalCount > 0 ? (item.count / totalCount) * 100 : 0;
+    const avg = item.count > 0 ? item.total / item.count : 0;
+    return {
+      method: item.method,
+      label: meta.label,
+      total: item.total,
+      count: item.count,
+      color: meta.color,
+      pctRevenue: Number(pctRev.toFixed(1)),
+      pctCount: Number(pctCount.toFixed(1)),
+      average: Math.round(avg)
+    };
+  });
+
+  const donutData = chartData.filter(d => d.total > 0).length > 0
+    ? chartData.filter(d => d.total > 0).map(d => ({ name: d.label, value: d.total, color: d.color, count: d.count }))
+    : chartData.map(d => ({ name: d.label, value: d.count || 1, color: d.color, count: d.count }));
+
+  const filterLabel = filterType === 'dia' ? 'Día Actual' : filterType === 'semana' ? 'Semana Actual' : filterType === 'mes' ? 'Mes Actual' : 'Rango Personalizado';
+
+  return (
+    <div className="bg-white dark:bg-white/5 p-5 rounded-3xl border border-gray-200 dark:border-white/5 space-y-4 shadow-lg">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-orange-500/10 text-orange-500 rounded-xl">
+              <DollarSign size={18} />
+            </div>
+            <h3 className="font-black text-sm uppercase tracking-wider text-black dark:text-white flex items-center gap-2">
+              Cobros por Métodos de Pago
+            </h3>
+          </div>
+          <p className="text-[9px] text-gray-500 dark:text-white/40 font-bold mt-1">
+            Volumen recaudado y cantidad de veces utilizado ({filterLabel}: {startDate || '—'} al {endDate || '—'}).
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase flex items-center gap-1.5 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Recaudado: ${totalRevenue.toLocaleString()}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase flex items-center gap-1.5 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            {totalCount} Cobros
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {chartData.map((m) => {
+          const meta = getMethodMeta(m.method);
+          return (
+            <div 
+              key={m.method}
+              className="bg-gray-50 dark:bg-black/30 p-3.5 rounded-2xl border border-gray-200 dark:border-white/5 flex flex-col justify-between space-y-2 hover:border-orange-500/30 transition-all"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <div className={`p-1.5 rounded-lg ${meta.bgBadge}`}>
+                    {getMethodIcon(m.method, 14)}
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-black dark:text-white tracking-wider">
+                    {m.label}
+                  </span>
+                </div>
+                <span className={`text-[7.5px] font-black px-1.5 py-0.5 rounded border ${meta.bgBadge} ${meta.borderBadge} ${meta.textBadge}`}>
+                  {m.pctRevenue}% $
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xl font-black text-black dark:text-white tracking-tight">
+                  ${m.total.toLocaleString()}
+                </p>
+                <div className="flex justify-between items-center text-[8px] font-bold text-gray-500 dark:text-white/40 mt-1">
+                  <span>{m.count} {m.count === 1 ? 'cobro' : 'cobros'} ({m.pctCount}%)</span>
+                  {m.count > 0 && (
+                    <span className="text-gray-400">Prom: ${m.average.toLocaleString()}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full bg-gray-200 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.max(m.pctRevenue, m.count > 0 ? 3 : 0)}%`, backgroundColor: meta.color }} 
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 dark:text-white/40">
+          Visualización Gráfica:
+        </span>
+        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+          <button 
+            onClick={() => setMetricView('both')}
+            className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${
+              metricView === 'both' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-500 dark:text-white/40 hover:text-black dark:hover:text-white'
+            }`}
+          >
+            📊 Combinado ($ y Cant.)
+          </button>
+          <button 
+            onClick={() => setMetricView('revenue')}
+            className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${
+              metricView === 'revenue' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 dark:text-white/40 hover:text-black dark:hover:text-white'
+            }`}
+          >
+            💵 Solo Total ($)
+          </button>
+          <button 
+            onClick={() => setMetricView('count')}
+            className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${
+              metricView === 'count' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 dark:text-white/40 hover:text-black dark:hover:text-white'
+            }`}
+          >
+            🔢 Solo Cantidad
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 h-64 bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-200 dark:border-white/5 flex flex-col justify-between">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-white/40">
+              {metricView === 'both' ? 'Total Recaudado ($) vs Cantidad de Cobros' : metricView === 'revenue' ? 'Total Recaudado ($)' : 'Cantidad de Cobros por Método'}
+            </span>
+            <span className="text-[8px] font-bold text-gray-400">
+              {chartData.length} Métodos analizados
+            </span>
+          </div>
+
+          <div className="h-52 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                <XAxis dataKey="label" stroke="#777" fontSize={9} tickLine={false} />
+                {(metricView === 'both' || metricView === 'revenue') && (
+                  <YAxis 
+                    yAxisId="left" 
+                    stroke="#10b981" 
+                    fontSize={8} 
+                    tickFormatter={(v) => `$${Number(v).toLocaleString()}`} 
+                  />
+                )}
+                {(metricView === 'both' || metricView === 'count') && (
+                  <YAxis 
+                    yAxisId={metricView === 'both' ? 'right' : 'left'} 
+                    orientation={metricView === 'both' ? 'right' : 'left'} 
+                    stroke="#3b82f6" 
+                    fontSize={8} 
+                    allowDecimals={false} 
+                  />
+                )}
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontSize: '10px', borderRadius: '12px', padding: '10px' }} 
+                  formatter={(val: any, name: any) => {
+                    if (name === 'Total Recaudado ($)') return [`$${Number(val).toLocaleString()}`, name];
+                    if (name === 'Cantidad de Cobros') return [`${val} operaciones`, name];
+                    return [val, name];
+                  }}
+                  labelStyle={{ fontWeight: 'bold', color: '#fff', textTransform: 'uppercase', marginBottom: '4px' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', fontWeight: '900', paddingTop: '6px' }} />
+                {(metricView === 'both' || metricView === 'revenue') && (
+                  <Bar 
+                    yAxisId="left" 
+                    dataKey="total" 
+                    name="Total Recaudado ($)" 
+                    fill="#10b981" 
+                    radius={[6, 6, 0, 0]} 
+                  />
+                )}
+                {(metricView === 'both' || metricView === 'count') && (
+                  <Bar 
+                    yAxisId={metricView === 'both' ? 'right' : 'left'} 
+                    dataKey="count" 
+                    name="Cantidad de Cobros" 
+                    fill="#3b82f6" 
+                    radius={[6, 6, 0, 0]} 
+                  />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="h-64 bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-200 dark:border-white/5 flex flex-col justify-between">
+          <p className="text-[9px] font-black uppercase text-gray-500 dark:text-white/40 tracking-wider text-center">
+            Participación en la Caja
+          </p>
+
+          <div className="h-40 relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie 
+                  data={donutData} 
+                  innerRadius={42} 
+                  outerRadius={58} 
+                  paddingAngle={4} 
+                  dataKey="value"
+                >
+                  {donutData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontSize: '10px', borderRadius: '10px' }} 
+                  formatter={(val: any) => [`$${Number(val).toLocaleString()}`, 'Total']}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-xs font-black text-black dark:text-white">${totalRevenue.toLocaleString()}</span>
+              <span className="text-[7px] font-bold text-gray-400 uppercase">Total Período</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1 pt-1 border-t border-gray-200 dark:border-white/5">
+            {chartData.slice(0, 4).map(item => (
+              <div key={item.method} className="flex items-center justify-between text-[7.5px] font-bold">
+                <span className="flex items-center gap-1 truncate" style={{ color: item.color }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </span>
+                <span className="text-black dark:text-white">{item.pctRevenue}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
@@ -3147,6 +3502,14 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
           />
         )}
       </div>
+
+      {/* Gráfico y métricas de Métodos de Pago */}
+      <PaymentMethodsStatsSection 
+        history={filteredHistory} 
+        startDate={startDate} 
+        endDate={endDate} 
+        filterType={filterType} 
+      />
 
       {/* Gráfico de Adquisición vs Retención (Nuevos vs Siguieron Yendo) */}
       <div className="bg-white dark:bg-white/5 p-5 rounded-2xl border border-gray-200 dark:border-white/5 space-y-4">
@@ -3779,21 +4142,48 @@ function FinanceModule({ data, members, startDate, setStartDate, endDate, setEnd
     { name: 'Siguieron Yendo (Recurrentes)', value: retainedMembers.length }
   ];
 
+  const handleFilterChange = (type: string) => {
+    setFilterType(type as any);
+    const d = new Date();
+    if (type === 'dia') {
+      setStartDate(d.toISOString().split('T')[0]);
+      setEndDate(d.toISOString().split('T')[0]);
+    } else if (type === 'semana') {
+      const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      setStartDate(monday.toISOString().split('T')[0]);
+      setEndDate(new Date().toISOString().split('T')[0]);
+    } else if (type === 'mes') {
+      const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+      setStartDate(firstDay.toISOString().split('T')[0]);
+      setEndDate(new Date().toISOString().split('T')[0]);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/5">
          <div className="flex items-center gap-4 flex-wrap w-full">
-            <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Agrupación</label>
-              <select className="block w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={filterType} onChange={e=>setFilterType(e.target.value)}>
-                <option value="dia">Por Día</option>
-                <option value="semana">Por Semana</option>
-                <option value="mes">Por Mes</option>
+            <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Filtrar por</label>
+              <select className="block w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={filterType} onChange={e=>handleFilterChange(e.target.value)}>
+                <option value="dia">Día Actual</option>
+                <option value="semana">Semana Actual</option>
+                <option value="mes">Mes Actual</option>
+                <option value="rango">Rango Personalizado</option>
               </select>
             </div>
-            <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Desde</label><input type="date" className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={startDate} onChange={e=>setStartDate(e.target.value)}/></div>
-            <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Hasta</label><input type="date" className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={endDate} onChange={e=>setEndDate(e.target.value)}/></div>
+            <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Desde</label><input type="date" className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={startDate} onChange={e=>{setStartDate(e.target.value); setFilterType('rango');}}/></div>
+            <div className="space-y-1"><label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black">Hasta</label><input type="date" className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg p-2 text-black dark:text-white text-[8px] outline-none" value={endDate} onChange={e=>{setEndDate(e.target.value); setFilterType('rango');}}/></div>
          </div>
       </div>
+
+      {/* Gráfico y métricas de Métodos de Pago */}
+      <PaymentMethodsStatsSection 
+        history={filteredHistory} 
+        startDate={startDate} 
+        endDate={endDate} 
+        filterType={filterType} 
+      />
 
       {/* Gráfico: Socios Nuevos vs Retención ("Siguieron yendo") */}
       <div className="bg-white dark:bg-white/5 p-5 rounded-2xl border border-gray-200 dark:border-white/5 space-y-4">
