@@ -51,8 +51,19 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
     const nextMonth = addOneMonthSameDay(today);
     const dayOfMonth = parseInt(today.split('-')[2], 10);
 
+    const defaultPlanName = (plans || []).find((p: any) => p.is_default)?.name 
+      || (plans || []).find((p: any) => p.name?.toLowerCase().includes('pase libre musculación'))?.name
+      || (plans || []).find((p: any) => p.name?.toLowerCase().includes('musculación'))?.name
+      || (plans || [])[0]?.name 
+      || '';
+
+    const initialPlan = isNew 
+      ? (member?.membership_type || defaultPlanName)
+      : (member?.membership_type || (plans || [])[0]?.name || '');
+
     return {
       ...member,
+      membership_type: initialPlan,
       is_new: member?.id ? !!member.is_new : true,
       joined_at: member?.joined_at || (isNew ? `${today}T00:00:00` : null),
       next_due_date: member?.next_due_date || (isNew ? `${nextMonth}T00:00:00` : null),

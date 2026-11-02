@@ -120,6 +120,7 @@ class Plan(Base):
     enable_custom_payment_methods = Column(Boolean, default=False)
     price_cash = Column(Float, nullable=True)
     price_transfer = Column(Float, nullable=True)
+    is_default = Column(Boolean, default=False)
 
 class Exercise(Base):
     __tablename__ = "exercises"

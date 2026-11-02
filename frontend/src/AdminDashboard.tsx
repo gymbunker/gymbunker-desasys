@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles, QrCode } from 'lucide-react';
+import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles, QrCode, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -1661,6 +1661,7 @@ export default function AdminDashboard() {
         days_per_week: selectedItem.daysPerWeek ?? selectedItem.days_per_week ?? 3,
         classes: classesList,
         is_active: true,
+        is_default: !!selectedItem.is_default,
         allow_unification: !!selectedItem.allow_unification,
         enable_custom_payment_methods: !!selectedItem.enable_custom_payment_methods,
         price_cash: selectedItem.enable_custom_payment_methods ? (selectedItem.price_cash !== '' && selectedItem.price_cash != null ? Number(selectedItem.price_cash) : Number(selectedItem.price) || 0) : null,
@@ -1685,6 +1686,20 @@ export default function AdminDashboard() {
       setIsModalOpen(false);
     } catch (e) { console.error(e); }
   };
+
+  const handleToggleDefaultPlan = async (plan: any) => {
+    try {
+      const res = await fetch(`${API_URL}/admin/plans/${plan.id}/set_default`, { method: 'POST' });
+      if (res.ok) {
+        refreshData();
+      } else {
+        alert('Error al marcar plan predeterminado');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleSaveMember = async (formData: any = selectedItem) => {
     try {
       const payload = { ...formData };
@@ -1997,7 +2012,12 @@ export default function AdminDashboard() {
           );
         }}
         onAddClick={() => { 
-          setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: plans[0]?.name || ''}); 
+          const defaultPlanName = plans.find((p: any) => p.is_default)?.name 
+            || plans.find((p: any) => p.name?.toLowerCase().includes('pase libre musculación'))?.name
+            || plans.find((p: any) => p.name?.toLowerCase().includes('musculación'))?.name
+            || plans[0]?.name 
+            || '';
+          setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: defaultPlanName}); 
           setIsEditMode(false); 
           setModalType('member'); 
           setIsModalOpen(true); 
@@ -2007,7 +2027,7 @@ export default function AdminDashboard() {
           setIsPaymentModalOpen(true); 
         }} 
       />;
-      case 'Planes': return <PlansModule plans={plans} onEdit={(p:any)=>{setSelectedItem({...p, allow_unification: !!p.allow_unification, enable_custom_payment_methods: !!p.enable_custom_payment_methods, price_cash: p.price_cash ?? p.price ?? 0, price_transfer: p.price_transfer ?? p.price ?? 0, classesInput: (p.classes || []).join(', ')}); setIsEditMode(true); setModalType('plan'); setIsModalOpen(true);}} onDelete={(p:any)=>{ showConfirm("¿Eliminar Plan?", `¿Estás seguro de que deseas eliminar el plan "${p.name}" del sistema?`, async () => { const res = await fetch(`${API_URL}/admin/plans/${p.id}`,{method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={()=>{setSelectedItem({name:'', price:0, daysPerWeek:3, classes:[], classesInput: '', allow_unification: false, enable_custom_payment_methods: false, price_cash: '', price_transfer: ''}); setIsEditMode(false); setModalType('plan'); setIsModalOpen(true);}} />;
+      case 'Planes': return <PlansModule plans={plans} onEdit={(p:any)=>{setSelectedItem({...p, is_default: !!p.is_default, allow_unification: !!p.allow_unification, enable_custom_payment_methods: !!p.enable_custom_payment_methods, price_cash: p.price_cash ?? p.price ?? 0, price_transfer: p.price_transfer ?? p.price ?? 0, classesInput: (p.classes || []).join(', ')}); setIsEditMode(true); setModalType('plan'); setIsModalOpen(true);}} onDelete={(p:any)=>{ showConfirm("¿Eliminar Plan?", `¿Estás seguro de que deseas eliminar el plan "${p.name}" del sistema?`, async () => { const res = await fetch(`${API_URL}/admin/plans/${p.id}`,{method:'DELETE'}); if(res.ok) refreshData(); }); }} onAddClick={()=>{setSelectedItem({name:'', price:0, daysPerWeek:3, classes:[], classesInput: '', is_default: false, allow_unification: false, enable_custom_payment_methods: false, price_cash: '', price_transfer: ''}); setIsEditMode(false); setModalType('plan'); setIsModalOpen(true);}} onToggleDefault={handleToggleDefaultPlan} />;
       case 'Entrenamientos': return <EntrenamientosModule API_URL={API_URL} />;
       case 'Agenda': return <AgendaModule members={members} API_URL={API_URL} setConfirmModal={setConfirmModal} />;
       case 'Mi Perfil': return <ProfileModule user={loggedUser} onSave={async (newPassword: string) => {
@@ -2275,6 +2295,27 @@ export default function AdminDashboard() {
                       </label>
                     </div>
 
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-black/30 rounded-xl border border-gray-200 dark:border-white/10 mt-2">
+                      <div className="flex items-center gap-2">
+                        <Star size={15} className={selectedItem?.is_default ? "fill-amber-400 text-amber-400" : "text-amber-500"} />
+                        <div>
+                          <label htmlFor="is_default_plan" className="text-[10px] font-black uppercase text-black dark:text-white cursor-pointer select-none block">
+                            Plan Predeterminado para Nuevos Socios ⭐
+                          </label>
+                          <p className="text-[8px] text-gray-400 dark:text-white/40">
+                            Aparece preseleccionado automáticamente al dar de alta un socio nuevo.
+                          </p>
+                        </div>
+                      </div>
+                      <input 
+                        type="checkbox" 
+                        id="is_default_plan"
+                        checked={!!selectedItem?.is_default} 
+                        onChange={e => setSelectedItem({...selectedItem, is_default: e.target.checked})}
+                        className="w-4 h-4 text-amber-500 rounded accent-amber-500 cursor-pointer"
+                      />
+                    </div>
+
                     {/* Diferenciación de precios por método de pago */}
                     <div className="pt-2 border-t border-gray-200 dark:border-white/10 space-y-3">
                       <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent rounded-2xl border border-orange-500/20">
@@ -2347,7 +2388,7 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <p className="text-[8px] text-gray-400 dark:text-white/40 italic">
-                            💡 Al cobrar la cuota a un socio, el monto sugerido se adaptará de acuerdo a si elegís Efectivo o Medios Digitales (Transferencia, MP JAVI, MP LUCIANO).
+                            💡 Al cobrar la cuota a un socio, el monto sugerido se adaptará de acuerdo a si elegís Efectivo o Medios Digitales (Transferencia, UALA JAVI, MP LUCIANO).
                           </p>
                         </div>
                       )}
@@ -2545,7 +2586,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
   const addPlansList: string[] = member.additional_plans || [];
   const addPlanObjs = addPlansList.map(n => plans.find((p:any) => p.name === n)).filter(Boolean);
 
-  const isTransferOrDigital = (m: string) => ['Transferencia', 'MP JAVI', 'MP LUCIANO'].includes(m);
+  const isTransferOrDigital = (m: string) => ['Transferencia', 'UALA JAVI', 'MP JAVI', 'MP LUCIANO'].includes(m);
 
   const getPriceForPlan = (plan: any, currentMethod: string) => {
     if (!plan) return 0;
@@ -2697,7 +2738,7 @@ function PaymentModal({ plans, member, onPay, onClose }: any) {
             </div>
             <div className="grid grid-cols-2 gap-2">
                <PaymentBtn active={method === 'Efectivo'} onClick={()=>handleSelectMethod('Efectivo')} label="Efectivo" icon={<Banknote size={15}/>} />
-               <PaymentBtn active={method === 'MP JAVI'} onClick={()=>handleSelectMethod('MP JAVI')} label="MP JAVI" icon={<QrCode size={15}/>} />
+               <PaymentBtn active={method === 'UALA JAVI'} onClick={()=>handleSelectMethod('UALA JAVI')} label="UALA JAVI" icon={<QrCode size={15}/>} />
                <PaymentBtn active={method === 'Transferencia'} onClick={()=>handleSelectMethod('Transferencia')} label="Transferencia" icon={<Smartphone size={15}/>} />
                <PaymentBtn active={method === 'MP LUCIANO'} onClick={()=>handleSelectMethod('MP LUCIANO')} label="MP LUCIANO" icon={<QrCode size={15}/>} />
             </div>
@@ -3041,7 +3082,7 @@ function PaymentMethodsStatsSection({
 }) {
   const [metricView, setMetricView] = useState<'both' | 'revenue' | 'count'>('both');
 
-  const PRIMARY_METHODS = ['Efectivo', 'MP JAVI', 'Transferencia', 'MP LUCIANO'];
+  const PRIMARY_METHODS = ['Efectivo', 'UALA JAVI', 'Transferencia', 'MP LUCIANO'];
 
   const METHOD_DETAILS: Record<string, { label: string; color: string; bgBadge: string; textBadge: string; borderBadge: string }> = {
     'Efectivo': {
@@ -3051,12 +3092,19 @@ function PaymentMethodsStatsSection({
       textBadge: 'text-emerald-500',
       borderBadge: 'border-emerald-500/20'
     },
-    'MP JAVI': {
-      label: 'MP JAVI',
+    'UALA JAVI': {
+      label: 'UALA JAVI',
       color: '#06b6d4',
       bgBadge: 'bg-cyan-500/10',
       textBadge: 'text-cyan-400',
       borderBadge: 'border-cyan-500/20'
+    },
+    'MP JAVI': {
+      label: 'MP JAVI (Histórico)',
+      color: '#0284c7',
+      bgBadge: 'bg-sky-500/10',
+      textBadge: 'text-sky-400',
+      borderBadge: 'border-sky-500/20'
     },
     'Transferencia': {
       label: 'Transferencia',
@@ -3101,7 +3149,8 @@ function PaymentMethodsStatsSection({
   const getMethodIcon = (m: string, size = 16) => {
     switch (m) {
       case 'Efectivo': return <Banknote size={size} className="text-emerald-500" />;
-      case 'MP JAVI': return <QrCode size={size} className="text-cyan-400" />;
+      case 'UALA JAVI': return <QrCode size={size} className="text-cyan-400" />;
+      case 'MP JAVI': return <QrCode size={size} className="text-sky-400" />;
       case 'Transferencia': return <Smartphone size={size} className="text-blue-400" />;
       case 'MP LUCIANO': return <QrCode size={size} className="text-purple-400" />;
       case 'Tarjeta': return <Receipt size={size} className="text-amber-400" />;
@@ -3961,7 +4010,7 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
   );
 }
 
-function PlansModule({ plans, onEdit, onDelete, onAddClick }: any) {
+function PlansModule({ plans, onEdit, onDelete, onAddClick, onToggleDefault }: any) {
   return (
     <div className="space-y-6">
       {/* Header con descripción */}
@@ -3976,7 +4025,7 @@ function PlansModule({ plans, onEdit, onDelete, onAddClick }: any) {
             </h3>
           </div>
           <p className="text-[10px] text-gray-500 dark:text-white/40 font-bold">
-            Administrá las tarifas del gimnasio y configurá montos diferenciados para Efectivo o Transferencia / MP.
+            Administrá las tarifas del gimnasio, configurá precios diferenciados y marcá con la estrella (⭐) el plan predeterminado para nuevos socios.
           </p>
         </div>
         <button 
@@ -3994,19 +4043,45 @@ function PlansModule({ plans, onEdit, onDelete, onAddClick }: any) {
           return (
             <div 
               key={p.id} 
-              className="p-5 bg-white dark:bg-white/5 rounded-3xl border border-gray-200 dark:border-white/5 hover:border-orange-500/30 transition-all duration-300 relative group flex flex-col justify-between shadow-lg hover:shadow-orange-500/5"
+              className={`p-5 bg-white dark:bg-white/5 rounded-3xl border transition-all duration-300 relative group flex flex-col justify-between shadow-lg ${
+                p.is_default 
+                  ? 'border-amber-500/50 dark:border-amber-500/40 shadow-amber-500/10 ring-1 ring-amber-500/20' 
+                  : 'border-gray-200 dark:border-white/5 hover:border-orange-500/30'
+              }`}
             >
               <div>
                 {/* Top badges */}
                 <div className="flex justify-between items-start gap-2 mb-3">
-                  <span className="px-2.5 py-1 rounded-xl bg-orange-500/10 text-orange-500 text-[8px] font-black uppercase tracking-widest border border-orange-500/20">
-                    {p.name}
-                  </span>
-                  {p.allow_unification && (
-                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[7px] font-black uppercase border border-cyan-500/20">
-                      Unificable
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2.5 py-1 rounded-xl bg-orange-500/10 text-orange-500 text-[8px] font-black uppercase tracking-widest border border-orange-500/20">
+                      {p.name}
                     </span>
-                  )}
+                    {p.is_default && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[7px] font-black uppercase border border-amber-500/30 flex items-center gap-1 shadow-sm">
+                        <Star size={9} className="fill-amber-400 text-amber-400" />
+                        Por Defecto
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {p.allow_unification && (
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[7px] font-black uppercase border border-cyan-500/20">
+                        Unificable
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onToggleDefault && onToggleDefault(p)}
+                      title={p.is_default ? "⭐ Plan predeterminado actual para nuevos socios. Clic para desmarcar." : "⭐ Marcar como plan predeterminado para nuevos socios"}
+                      className={`p-1.5 rounded-xl border transition-all ${
+                        p.is_default 
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-sm shadow-amber-500/20 hover:scale-105' 
+                          : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-400 border-gray-200 dark:border-white/10 hover:text-amber-400 hover:border-amber-400/30'
+                      }`}
+                    >
+                      <Star size={14} className={p.is_default ? "fill-amber-400 text-amber-400" : ""} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Base Price */}

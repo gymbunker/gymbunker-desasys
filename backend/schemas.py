@@ -155,6 +155,7 @@ class PlanBase(BaseModel):
     enable_custom_payment_methods: Optional[bool] = False
     price_cash: Optional[float] = None
     price_transfer: Optional[float] = None
+    is_default: Optional[bool] = False
 
 class PlanCreate(PlanBase):
     pass

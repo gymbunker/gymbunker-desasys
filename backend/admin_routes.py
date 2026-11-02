@@ -1436,7 +1436,10 @@ def get_plans(db: Session = Depends(get_db)):
 
 @router.post("/plans", response_model=schemas.PlanSchema)
 def create_plan(plan: schemas.PlanCreate, db: Session = Depends(get_db)):
-    db_plan = models.Plan(**plan.dict())
+    plan_data = plan.dict()
+    if plan_data.get("is_default"):
+        db.query(models.Plan).update({models.Plan.is_default: False})
+    db_plan = models.Plan(**plan_data)
     db.add(db_plan)
     db.commit()
     db.refresh(db_plan)
@@ -1447,11 +1450,26 @@ def update_plan(plan_id: int, plan: schemas.PlanCreate, db: Session = Depends(ge
     db_plan = db.query(models.Plan).filter(models.Plan.id == plan_id).first()
     if not db_plan:
         raise HTTPException(status_code=404, detail="Plan not found")
-    for key, value in plan.dict().items():
+    plan_data = plan.dict()
+    if plan_data.get("is_default"):
+        db.query(models.Plan).filter(models.Plan.id != plan_id).update({models.Plan.is_default: False})
+    for key, value in plan_data.items():
         setattr(db_plan, key, value)
     db.commit()
     db.refresh(db_plan)
     return db_plan
+
+@router.post("/plans/{plan_id}/set_default")
+def set_default_plan(plan_id: int, db: Session = Depends(get_db)):
+    db_plan = db.query(models.Plan).filter(models.Plan.id == plan_id).first()
+    if not db_plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    new_status = not bool(db_plan.is_default)
+    db.query(models.Plan).update({models.Plan.is_default: False})
+    db_plan.is_default = new_status
+    db.commit()
+    db.refresh(db_plan)
+    return {"status": "success", "id": db_plan.id, "is_default": db_plan.is_default, "name": db_plan.name}
 
 @router.delete("/plans/{plan_id}")
 def delete_plan(plan_id: int, db: Session = Depends(get_db)):
