@@ -1430,9 +1430,43 @@ def delete_staff(staff_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
-@router.get("/plans", response_model=List[schemas.PlanSchema])
+@router.get("/plans")
 def get_plans(db: Session = Depends(get_db)):
-    return db.query(models.Plan).filter(models.Plan.is_active == True).all()
+    try:
+        plans = db.query(models.Plan).filter(models.Plan.is_active == True).all()
+        res = []
+        for p in plans:
+            res.append({
+                "id": p.id,
+                "name": p.name,
+                "price": p.price,
+                "days_per_week": p.days_per_week or 3,
+                "classes": p.classes if isinstance(p.classes, list) else [],
+                "is_active": p.is_active if p.is_active is not None else True,
+                "allow_unification": bool(getattr(p, 'allow_unification', False)),
+                "enable_custom_payment_methods": bool(getattr(p, 'enable_custom_payment_methods', False)),
+                "price_cash": getattr(p, 'price_cash', None),
+                "price_transfer": getattr(p, 'price_transfer', None),
+                "is_default": bool(getattr(p, 'is_default', False))
+            })
+        return res
+    except Exception as e:
+        db.rollback()
+        try:
+            from sqlalchemy import text
+            raw = db.execute(text("SELECT id, name, price, days_per_week, classes, is_active FROM plans WHERE is_active = true")).fetchall()
+            return [
+                {
+                    "id": r[0], "name": r[1], "price": r[2], "days_per_week": r[3] or 3,
+                    "classes": r[4] if isinstance(r[4], list) else [], "is_active": r[5],
+                    "allow_unification": False, "enable_custom_payment_methods": False,
+                    "price_cash": None, "price_transfer": None, "is_default": False
+                }
+                for r in raw
+            ]
+        except Exception as e2:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Error al obtener planes: {str(e2)}")
 
 @router.post("/plans", response_model=schemas.PlanSchema)
 def create_plan(plan: schemas.PlanCreate, db: Session = Depends(get_db)):

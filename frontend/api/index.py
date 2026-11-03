@@ -25,6 +25,8 @@ def auto_migrate():
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS enable_custom_payment_methods BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS price_cash DOUBLE PRECISION;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS price_transfer DOUBLE PRECISION;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE;",
+        "UPDATE plans SET is_default = TRUE WHERE id = (SELECT id FROM plans WHERE name ILIKE '%Pase Libre Musculación%' OR name ILIKE '%Musculación%' OR name ILIKE '%Pase Libre%' ORDER BY id LIMIT 1) AND NOT EXISTS (SELECT 1 FROM plans WHERE is_default = TRUE);",
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS is_new BOOLEAN DEFAULT FALSE;",
         "UPDATE members SET dni = NULL WHERE dni = '' OR TRIM(dni) = '';",
         "UPDATE members SET email = NULL WHERE email = '' OR TRIM(email) = '';",
