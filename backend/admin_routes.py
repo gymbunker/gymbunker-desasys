@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+﻿from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from database import get_db
@@ -19,6 +19,7 @@ from email.mime.application import MIMEApplication
 import re
 import os
 import logging
+import time
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 try:
@@ -27,6 +28,12 @@ except ImportError:
     from security import hash_password, verify_password
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+# In-memory cache for /admin/members endpoint (invalidated on writes)
+_members_cache = None
+_members_cache_ts = 0
+_MEMBERS_CACHE_TTL = 30  # seconds
 
 @router.post("/login")
 def admin_login(credentials: schemas.StaffLogin, db: Session = Depends(get_db)):
@@ -91,82 +98,100 @@ def get_gym_stats(db: Session = Depends(get_db)):
         ]
     }
 
+def _invalidate_members_cache():
+    global _members_cache, _members_cache_ts
+    _members_cache = None
+    _members_cache_ts = 0
+
+def _compute_member_status(m, now):
+    """Compute the correct status for a member based on dates."""
+    wdata = m.wellness_data or {}
+    if m.keep_billing_day is None and "keep_billing_day" in wdata:
+        m.keep_billing_day = wdata["keep_billing_day"]
+    if m.fixed_billing_day is None and "fixed_billing_day" in wdata:
+        m.fixed_billing_day = wdata["fixed_billing_day"]
+    if m.next_due_date is None and "next_due_date" in wdata and wdata["next_due_date"]:
+        try:
+            m.next_due_date = datetime.datetime.fromisoformat(wdata["next_due_date"].replace("Z", ""))
+        except Exception:
+            pass
+
+    if m.status == "INACTIVO":
+        return None  # No change
+
+    if m.next_due_date:
+        days_until_due = (m.next_due_date.date() - now.date()).days
+        if days_until_due <= -10:
+            return "INACTIVO"
+        elif days_until_due < 0:
+            return "DEUDA"
+        elif days_until_due <= 7:
+            return "POR VENCER"
+        else:
+            return "ACTIVO"
+    elif m.joined_at:
+        membership_type = (m.membership_type or "").upper()
+        validity_days = 30
+        if "TRIMESTRAL" in membership_type:
+            validity_days = 90
+        elif "SEMESTRAL" in membership_type:
+            validity_days = 180
+        elif "ANUAL" in membership_type:
+            validity_days = 365
+        days_since = (now - m.joined_at).days
+        if days_since >= validity_days + 10:
+            return "INACTIVO"
+        elif days_since >= validity_days:
+            return "DEUDA"
+        elif days_since >= validity_days - 7:
+            return "POR VENCER"
+        else:
+            return "ACTIVO"
+    return None  # No change
+
 @router.get("/members", response_model=List[schemas.MemberSchema])
 def get_all_members(db: Session = Depends(get_db)):
-    members = db.query(models.Member).all()
+    global _members_cache, _members_cache_ts
     now = datetime.datetime.utcnow()
+
+    # Return cached result if still fresh and no status updates pending
+    if _members_cache is not None and (time.time() - _members_cache_ts) < _MEMBERS_CACHE_TTL:
+        return _members_cache
+
+    members = db.query(models.Member).all()
     updated = False
     for m in members:
-        # Sync from wellness_data if columns are None
-        wdata = m.wellness_data or {}
-        if m.keep_billing_day is None and "keep_billing_day" in wdata:
-            m.keep_billing_day = wdata["keep_billing_day"]
-        if m.fixed_billing_day is None and "fixed_billing_day" in wdata:
-            m.fixed_billing_day = wdata["fixed_billing_day"]
-        if m.next_due_date is None and "next_due_date" in wdata and wdata["next_due_date"]:
-            try:
-                m.next_due_date = datetime.datetime.fromisoformat(wdata["next_due_date"].replace("Z", ""))
-            except Exception:
-                pass
-
-        if m.status != "INACTIVO":
-            if m.next_due_date:
-                days_until_due = (m.next_due_date.date() - now.date()).days
-                if days_until_due <= -10:
-                    new_status = "INACTIVO"
-                elif days_until_due < 0:
-                    new_status = "DEUDA"
-                elif days_until_due <= 7:
-                    new_status = "POR VENCER"
-                else:
-                    new_status = "ACTIVO"
-            elif m.joined_at:
-                membership_type = (m.membership_type or "").upper()
-                validity_days = 30
-                if "TRIMESTRAL" in membership_type:
-                    validity_days = 90
-                elif "SEMESTRAL" in membership_type:
-                    validity_days = 180
-                elif "ANUAL" in membership_type:
-                    validity_days = 365
-
-                days_since = (now - m.joined_at).days
-                if days_since >= validity_days + 10:
-                    new_status = "INACTIVO"
-                elif days_since >= validity_days:
-                    new_status = "DEUDA"
-                elif days_since >= validity_days - 7:
-                    new_status = "POR VENCER"
-                else:
-                    new_status = "ACTIVO"
-            else:
-                new_status = m.status
-            
-            if m.status != new_status:
-                old_status = m.status
-                m.status = new_status
-                notify_member_status_change(m, old_status, new_status, db)
-                updated = True
+        new_status = _compute_member_status(m, now)
+        if new_status is not None and m.status != new_status:
+            old_status = m.status
+            m.status = new_status
+            notify_member_status_change(m, old_status, new_status, db)
+            updated = True
     if updated:
         db.commit()
+        _invalidate_members_cache()
 
     result = []
     for m in members:
-        # Convert to dict first to avoid Pydantic mutability constraints
         m_dict = schemas.MemberSchema.from_orm(m).dict()
         m_dict["password"] = ""
+        # Limit billing history to last 36 payments for performance
+        sorted_payments = sorted(m.payments, key=lambda x: x.created_at, reverse=True)[:36]
         m_dict["billing_history"] = [
             {
                 "id": p.id,
                 "date": p.created_at.strftime("%Y-%m-%d"),
                 "amount": p.amount,
-                "plan": m.membership_type or "Musculación",
+                "plan": m.membership_type or "Musculacion",
                 "method": p.method,
-                "processed_by": p.stripe_id or "—",
+                "processed_by": p.stripe_id or "-",
                 "status": "PAGADO"
-            } for p in sorted(m.payments, key=lambda x: x.created_at, reverse=True)
+            } for p in sorted_payments
         ]
         result.append(m_dict)
+
+    _members_cache = result
+    _members_cache_ts = time.time()
     return result
 
 @router.post("/members", response_model=schemas.MemberSchema)
@@ -214,6 +239,7 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     db.add(db_member)
     try:
         db.commit()
+        _invalidate_members_cache()
         db.refresh(db_member)
         print(f"Member created successfully with ID {db_member.id}")
         m_dict = schemas.MemberSchema.from_orm(db_member).dict()
@@ -331,6 +357,7 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
 
     try:
         db.commit()
+        _invalidate_members_cache()
         db.refresh(db_member)
         m_dict = schemas.MemberSchema.from_orm(db_member).dict()
         m_dict["password"] = ""
@@ -355,7 +382,7 @@ def get_whatsapp_status_message(status: str) -> str:
     elif st == "POR VENCER":
         return "Hola soy BUNKER BOT de BUNKER GYM, como estas ? te hablaba para hacerte recordar que tu cuenta del gym esta POR VENCER no te olvides de renovar antes que sea tarde"
     elif st == "DEUDA":
-        return "Hola soy BUNKER BOT de BUNKER GYM, tu plan está VENCIDO y figura en DEUDA, necesitamos que reestablezcas el pago, acercate a nuestro personal y comenta tu situacion"
+        return "Hola soy BUNKER BOT de BUNKER GYM, tu cuota mensual nos figura impaga, acercate por favor a nuestro personal y comenta tu situacion. Muchas gracias."
     return "Hola soy BUNKER BOT de BUNKER GYM, como estas ? Te contactamos desde BUNKER GYM."
 
 def dispatch_whatsapp_message(target_phone: str, message: str, sender_phone: str = None, pdf_base64: str = None, filename: str = None) -> bool:
@@ -1312,6 +1339,7 @@ def record_payment(
     flag_modified(member, "wellness_data")
 
     db.commit()
+    _invalidate_members_cache()
     return {
         "status": "payment recorded",
         "amount": final_amount,
@@ -1328,6 +1356,7 @@ def delete_payment(payment_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Payment not found")
     db.delete(payment)
     db.commit()
+    _invalidate_members_cache()
     return {"status": "deleted"}
 
 @router.get("/pricing/dynamic")
@@ -1345,10 +1374,12 @@ def delete_member(member_id: int, permanent: bool = False, db: Session = Depends
     if permanent:
         db.delete(member)
         db.commit()
+        _invalidate_members_cache()
         return {"status": "deleted"}
     else:
         member.status = "INACTIVO"
         db.commit()
+        _invalidate_members_cache()
         return {"status": "inactivo"}
 
 @router.get("/finance/summary")
@@ -2028,3 +2059,4 @@ def set_config(key: str, payload: dict, db: Session = Depends(get_db)):
         db.add(config)
     db.commit()
     return {"status": "success"}
+

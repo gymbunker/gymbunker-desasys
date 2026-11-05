@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles, QrCode, Star } from 'lucide-react';
+﻿import { LayoutDashboard, Users, User, Brain, DollarSign, Lock, ShieldCheck, Briefcase, Download, CheckCircle, XCircle, Trash2, X, Settings, Receipt, Smartphone, Banknote, Search, Moon, Sun, AlertTriangle , Calendar, Clock, Info, Mail, Eye, EyeOff, Sparkles, QrCode, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -1217,7 +1217,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().split('T')[0]; });
+  const [startDate, setStartDate] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [filterType, setFilterType] = useState<'dia' | 'semana' | 'mes'>('mes');
 
@@ -2903,7 +2903,7 @@ function PaymentBtn({ active, onClick, label, icon }: any) {
 
 function BillingModule({ members, onDeletePayment }: any) {
   const [filterType, setFilterType] = useState<'dia' | 'semana' | 'mes' | 'rango'>('mes');
-  const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().split('T')[0]; });
+  const [startDate, setStartDate] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const handleFilterChange = (type: string) => {
@@ -3842,6 +3842,8 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
   const [sendingWsId, setSendingWsId] = useState<number | null>(null);
   const [wsToast, setWsToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const MEMBERS_PER_PAGE = 50;
 
   const statusOptions = ['TODOS', 'NUEVOS', 'ACTIVO', 'POR VENCER', 'DEUDA', 'INACTIVO'];
 
@@ -3893,6 +3895,9 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
     })
     .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
+  const totalPages = Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE);
+  const paginatedMembers = filteredMembers.slice((currentPage - 1) * MEMBERS_PER_PAGE, currentPage * MEMBERS_PER_PAGE);
+
   return (
     <div className="space-y-4 relative">
       {wsToast && (
@@ -3907,11 +3912,11 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:w-52">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-white/20" size={14} />
-            <input type="text" placeholder="Buscar por DNI o Nombre..." className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-4 text-black dark:text-white text-[10px] outline-none focus:border-orange-500/50 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <input type="text" placeholder="Buscar por DNI o Nombre..." className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-4 text-black dark:text-white text-[10px] outline-none focus:border-orange-500/50 transition-all" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} />
           </div>
           <div className="flex gap-1 flex-wrap">
             {statusOptions.map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
+              <button key={s} onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
                 className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${statusFilter === s ? (s === 'NUEVOS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-orange-500 text-black') : 'bg-white dark:bg-white/5 text-gray-500 dark:text-white/30 hover:text-black dark:hover:text-white'}`}>
                 {s === 'TODOS' ? `Todos (${members.length})` 
                   : s === 'NUEVOS' ? `✨ Nuevos (${members.filter(isMemberNew).length})`
@@ -3926,7 +3931,7 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {filteredMembers.map((m: any) => {
+        {paginatedMembers.map((m: any) => {
           const isFixed = Boolean(m.keep_billing_day ?? m.wellness_data?.keep_billing_day);
           const fixedDay = m.fixed_billing_day ?? m.wellness_data?.fixed_billing_day;
           const nextDue = m.next_due_date || m.wellness_data?.next_due_date;
@@ -4006,6 +4011,29 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
           );
         })}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 disabled:opacity-30 hover:border-orange-500/50 transition-all"
+          >
+            &laquo; Anterior
+          </button>
+          <span className="text-[9px] font-black text-gray-500 dark:text-white/40 uppercase">
+            Página {currentPage} / {totalPages} &mdash; {filteredMembers.length} socios
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 disabled:opacity-30 hover:border-orange-500/50 transition-all"
+          >
+            Siguiente &raquo;
+          </button>
+        </div>
+      )}
     </div>
   );
 }
