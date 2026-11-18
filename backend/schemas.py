@@ -33,6 +33,7 @@ class MemberBase(BaseModel):
     dni: Optional[str] = None
     name: str
     email: Optional[str] = None
+    gender: Optional[str] = "Masculino"
     status: str = "ACTIVO"
     photo_url: Optional[str] = None
     phone: Optional[str] = None
@@ -52,6 +53,7 @@ class MemberCreate(BaseModel):
     dni: Optional[str] = None
     name: str
     email: Optional[str] = None
+    gender: Optional[str] = "Masculino"
     status: str = "ACTIVO"
     photo_url: Optional[str] = None
     phone: Optional[str] = None

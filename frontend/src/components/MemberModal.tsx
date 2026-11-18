@@ -63,6 +63,7 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
 
     return {
       ...member,
+      gender: member?.gender || 'Masculino',
       membership_type: initialPlan,
       is_new: member?.id ? !!member.is_new : true,
       joined_at: member?.joined_at || (isNew ? `${today}T00:00:00` : null),
@@ -255,6 +256,7 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
     cleanFormData.dni = cleanFormData.dni?.trim() ? cleanFormData.dni.trim() : null;
     cleanFormData.email = cleanFormData.email?.trim() ? cleanFormData.email.trim() : null;
     cleanFormData.phone = cleanFormData.phone?.trim() ? cleanFormData.phone.trim() : null;
+    cleanFormData.gender = cleanFormData.gender || 'Masculino';
 
     cleanFormData.is_new = Boolean(formData?.is_new);
 
@@ -316,7 +318,11 @@ export default function MemberModal({ member, plans, API_URL, onSave, onClose }:
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <input type="text" placeholder="WhatsApp / Teléfono (Opcional)" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                 <input type="email" placeholder="Correo Electrónico (Opcional)" className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs outline-none focus:border-orange-500" value={formData?.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
+                 <select className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-black dark:text-white text-xs font-bold outline-none focus:border-orange-500" value={formData?.gender || 'Masculino'} onChange={e => setFormData({...formData, gender: e.target.value})}>
+                    <option value="Masculino">Género: Masculino</option>
+                    <option value="Femenino">Género: Femenino</option>
+                    <option value="Otro">Género: Otro</option>
+                 </select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">

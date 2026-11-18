@@ -19,7 +19,7 @@ function AgendaModule({ members, API_URL }: any) {
   const [classBookings, setClassBookings] = useState<any[]>([]);
   const [walkInQuery, setWalkInQuery] = useState('');
   const [isNewMemberOpen, setIsNewMemberOpen] = useState(false);
-  const [newMemberData, setNewMemberData] = useState({ name: '', dni: '', phone: '', email: '', membership_type: 'Basic' });
+  const [newMemberData, setNewMemberData] = useState({ name: '', dni: '', phone: '', gender: 'Masculino', membership_type: 'Basic' });
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayDesc, setHolidayDesc] = useState('');
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
@@ -281,7 +281,7 @@ function AgendaModule({ members, API_URL }: any) {
         const createdMember = await res.json();
         await handleAddWalkIn(createdMember);
         setIsNewMemberOpen(false);
-        setNewMemberData({ name: '', dni: '', phone: '', email: '', membership_type: 'Basic' });
+        setNewMemberData({ name: '', dni: '', phone: '', gender: 'Masculino', membership_type: 'Basic' });
       } else {
         const err = await res.json();
         alert(err.detail || "Error al crear socio");
@@ -1146,10 +1146,14 @@ function AgendaModule({ members, API_URL }: any) {
               <input type="text" placeholder="Nombre Completo" required className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs outline-none" value={newMemberData.name} onChange={e=>setNewMemberData({...newMemberData, name: e.target.value})} />
               <input type="text" placeholder="DNI" required className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs outline-none" value={newMemberData.dni} onChange={e=>setNewMemberData({...newMemberData, dni: e.target.value})} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <input type="text" placeholder="WhatsApp / Celular" className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs outline-none" value={newMemberData.phone} onChange={e=>setNewMemberData({...newMemberData, phone: e.target.value})} />
-              <input type="email" placeholder="Correo" className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs outline-none" value={newMemberData.email} onChange={e=>setNewMemberData({...newMemberData, email: e.target.value})} />
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="WhatsApp / Celular" className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs outline-none" value={newMemberData.phone} onChange={e=>setNewMemberData({...newMemberData, phone: e.target.value})} />
+                <select className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs font-bold outline-none" value={newMemberData.gender || 'Masculino'} onChange={e=>setNewMemberData({...newMemberData, gender: e.target.value})}>
+                  <option value="Masculino">Género: Masculino</option>
+                  <option value="Femenino">Género: Femenino</option>
+                  <option value="Otro">Género: Otro</option>
+                </select>
+              </div>
             <div className="space-y-1">
               <label className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black ml-2">Membresía</label>
               <select className="w-full bg-[#141b29]/40 dark:bg-black/40 border border-white/10 rounded-xl p-3 text-black dark:text-white text-xs outline-none" value={newMemberData.membership_type} onChange={e=>setNewMemberData({...newMemberData, membership_type: e.target.value})}>
@@ -1720,6 +1724,7 @@ export default function AdminDashboard() {
       } else if (!payload.phone) {
         payload.phone = null;
       }
+      payload.gender = payload.gender || 'Masculino';
 
       if (isEditMode) {
         if (!payload.password || payload.password.trim() === '' || payload.password.startsWith('pbkdf2:')) {
@@ -2020,7 +2025,7 @@ export default function AdminDashboard() {
             || plans.find((p: any) => p.name?.toLowerCase().includes('musculación'))?.name
             || plans[0]?.name 
             || '';
-          setSelectedItem({name:'', dni:'', phone:'', email:'', password:'1234', status:'ACTIVO', membership_type: defaultPlanName}); 
+          setSelectedItem({name:'', dni:'', phone:'', gender:'Masculino', password:'1234', status:'ACTIVO', membership_type: defaultPlanName}); 
           setIsEditMode(false); 
           setModalType('member'); 
           setIsModalOpen(true); 
@@ -3956,6 +3961,11 @@ function MembersModule({ members, onEdit, onDelete, onReactivate, onPermanentDel
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     <span className="text-[8px] text-gray-500 dark:text-white/20 uppercase font-black truncate">{m.membership_type || '—'}</span>
                     <StatusBadge status={m.status} />
+                    {m.gender && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase tracking-wider border ${m.gender === 'Femenino' ? 'bg-pink-500/10 text-pink-400 border-pink-500/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>
+                        {m.gender}
+                      </span>
+                    )}
                     {isMemberNew(m) && (
                       <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-sm animate-pulse">
                         <span className="w-1 h-1 rounded-full bg-emerald-400" />

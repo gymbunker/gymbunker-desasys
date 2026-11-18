@@ -175,6 +175,7 @@ def get_all_members(db: Session = Depends(get_db)):
     for m in members:
         m_dict = schemas.MemberSchema.from_orm(m).dict()
         m_dict["password"] = ""
+        m_dict["gender"] = m.gender or "Masculino"
         # Limit billing history to last 36 payments for performance
         sorted_payments = sorted(m.payments, key=lambda x: x.created_at, reverse=True)[:36]
         m_dict["billing_history"] = [
