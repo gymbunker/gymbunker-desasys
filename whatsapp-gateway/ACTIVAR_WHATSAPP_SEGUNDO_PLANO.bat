@@ -8,6 +8,10 @@ if exist "C:\Program Files\nodejs" set "PATH=%PATH%;C:\Program Files\nodejs"
 if exist "C:\Program Files (x86)\nodejs" set "PATH=%PATH%;C:\Program Files (x86)\nodejs"
 if exist "%APPDATA%\npm" set "PATH=%PATH%;%APPDATA%\npm"
 
+set "NODE_CMD=node"
+if exist "C:\Program Files\nodejs\node.exe" set "NODE_CMD=C:\Program Files\nodejs\node.exe"
+if exist "C:\Program Files (x86)\nodejs\node.exe" set "NODE_CMD=C:\Program Files (x86)\nodejs\node.exe"
+
 echo ==============================================================
 echo       ACTIVANDO PASARELA WHATSAPP EN SEGUNDO PLANO
 echo ==============================================================
@@ -18,15 +22,7 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3001') do taskkill /F /PID %
 timeout /t 1 >nul
 
 echo [2/3] Iniciando servicio en segundo plano (sin ventanas molestas)...
-:: Regenerar start_silent.vbs seguro sin barra invertida final
-(
-echo Set WshShell = CreateObject^("WScript.Shell"^)
-echo Set fso = CreateObject^("Scripting.FileSystemObject"^)
-echo WshShell.CurrentDirectory = fso.GetParentFolderName^(WScript.ScriptFullName^)
-echo WshShell.Run "cmd /c node run.js", 0, False
-) > "%~dp0start_silent.vbs"
-
-wscript "%~dp0start_silent.vbs"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%NODE_CMD%' -ArgumentList 'run.js' -WorkingDirectory '%~dp0' -WindowStyle Hidden"
 timeout /t 3 >nul
 
 echo [3/3] Abriendo panel de WhatsApp en el navegador...
