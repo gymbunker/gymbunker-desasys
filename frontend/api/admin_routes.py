@@ -156,6 +156,7 @@ def get_all_members(db: Session = Depends(get_db)):
             # Convert to dict first to avoid Pydantic mutability constraints
             m_dict = schemas.MemberSchema.from_orm(m).dict()
             m_dict["password"] = ""
+            m_dict["gender"] = m.gender or "Masculino"
             m_dict["billing_history"] = [
                 {
                     "id": p.id,
@@ -178,6 +179,7 @@ def get_all_members(db: Session = Depends(get_db)):
 def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     print(f"Creating member: {member.name} with DNI {member.dni}")
     data = member.dict()
+    data["gender"] = data.get("gender") or "Masculino"
 
     # DNI sanitization: None if blank or empty
     raw_dni = data.get('dni')
@@ -245,6 +247,7 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         raise HTTPException(status_code=404, detail="Member not found")
 
     data = member_data.dict()
+    data["gender"] = data.get("gender") or "Masculino"
 
     # DNI sanitization: None if blank or empty
     raw_dni = data.get('dni')
@@ -281,44 +284,24 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
     clean_phone = str(raw_phone).strip() if raw_phone is not None and str(raw_phone).strip() != "" else None
     data['phone'] = clean_phone
 
+    old_status = db_member.status
+    # Si se está reactivando explícitamente un socio INACTIVO a ACTIVO, resetear fechas
+    if old_status == "INACTIVO" and data.get("status") == "ACTIVO":
+        now_dt = datetime.datetime.utcnow()
+        membership_type = (data.get("membership_type") or db_member.membership_type or "").upper()
+        validity_days = 30
+        if "TRIMESTRAL" in membership_type:
+            validity_days = 90
+        elif "SEMESTRAL" in membership_type:
+            validity_days = 180
+        elif "ANUAL" in membership_type:
+            validity_days = 365
+        data["joined_at"] = now_dt
+        data["next_due_date"] = now_dt + datetime.timedelta(days=validity_days)
+
     if not data.get('joined_at'):
         data['joined_at'] = db_member.joined_at
-    # Recalculate status from next_due_date (if present) or joined_at so editing reflects correctly
-    joined = data['joined_at']
-    next_due = data.get('next_due_date') or db_member.next_due_date
-    if data.get('status') != 'INACTIVO':
-        if next_due:
-            now_date = datetime.datetime.utcnow().date()
-            due_date = next_due.date() if isinstance(next_due, datetime.datetime) else datetime.date.fromisoformat(str(next_due)[:10])
-            days_until_due = (due_date - now_date).days
-            if days_until_due <= -10:
-                data['status'] = 'INACTIVO'
-            elif days_until_due < 0:
-                data['status'] = 'DEUDA'
-            elif days_until_due <= 7:
-                data['status'] = 'POR VENCER'
-            else:
-                data['status'] = 'ACTIVO'
-        elif joined:
-            days_since = (datetime.datetime.utcnow() - joined).days
-            plan = (data.get('membership_type') or db_member.membership_type or "").upper()
-            total_days = 30
-            if plan == "TRIMESTRAL":
-                total_days = 90
-            elif plan == "SEMESTRAL":
-                total_days = 180
-            elif plan == "ANUAL":
-                total_days = 365
-                
-            if days_since >= total_days + 10:
-                data['status'] = 'INACTIVO'
-            elif days_since >= total_days:
-                data['status'] = 'DEUDA'
-            elif days_since >= total_days - 7:
-                data['status'] = 'POR VENCER'
-            else:
-                data['status'] = 'ACTIVO'
-    old_status = db_member.status
+
     for key, value in data.items():
         if key == 'password':
             if value and not value.startswith('pbkdf2:'):
@@ -339,6 +322,7 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         db.refresh(db_member)
         m_dict = schemas.MemberSchema.from_orm(db_member).dict()
         m_dict["password"] = ""
+        m_dict["gender"] = db_member.gender or "Masculino"
         return m_dict
     except IntegrityError as e:
         db.rollback()

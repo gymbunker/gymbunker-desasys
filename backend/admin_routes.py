@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from database import get_db
@@ -303,8 +303,10 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
     clean_phone = str(raw_phone).strip() if raw_phone is not None and str(raw_phone).strip() != "" else None
     data['phone'] = clean_phone
 
+    old_status = db_member.status
+
     # Si el socio estaba INACTIVO y se solicita reactivarlo a ACTIVO
-    if db_member.status == 'INACTIVO' and data.get('status') == 'ACTIVO':
+    if old_status == 'INACTIVO' and data.get('status') == 'ACTIVO':
         now_dt = datetime.datetime.utcnow()
         data['joined_at'] = now_dt
         m_type = (data.get('membership_type') or db_member.membership_type or '').upper()
@@ -313,42 +315,7 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         data['status'] = 'ACTIVO'
     if not data.get('joined_at'):
         data['joined_at'] = db_member.joined_at
-    # Recalculate status from next_due_date (if present) or joined_at so editing reflects correctly
-    joined = data['joined_at']
-    next_due = data.get('next_due_date') or db_member.next_due_date
-    if data.get('status') != 'INACTIVO':
-        if next_due:
-            now_date = datetime.datetime.utcnow().date()
-            due_date = next_due.date() if isinstance(next_due, datetime.datetime) else datetime.date.fromisoformat(str(next_due)[:10])
-            days_until_due = (due_date - now_date).days
-            if days_until_due <= -10:
-                data['status'] = 'INACTIVO'
-            elif days_until_due < 0:
-                data['status'] = 'DEUDA'
-            elif days_until_due <= 7:
-                data['status'] = 'POR VENCER'
-            else:
-                data['status'] = 'ACTIVO'
-        elif joined:
-            membership_type = (data.get('membership_type') or db_member.membership_type or "").upper()
-            validity_days = 30
-            if "TRIMESTRAL" in membership_type:
-                validity_days = 90
-            elif "SEMESTRAL" in membership_type:
-                validity_days = 180
-            elif "ANUAL" in membership_type:
-                validity_days = 365
 
-            days_since = (datetime.datetime.utcnow() - joined).days
-            if days_since >= validity_days + 10:
-                data['status'] = 'INACTIVO'
-            elif days_since >= validity_days:
-                data['status'] = 'DEUDA'
-            elif days_since >= validity_days - 7:
-                data['status'] = 'POR VENCER'
-            else:
-                data['status'] = 'ACTIVO'
-    old_status = db_member.status
     for key, value in data.items():
         if key == 'password':
             if value and not value.startswith('pbkdf2:'):
@@ -370,6 +337,7 @@ def update_member(member_id: int, member_data: schemas.MemberCreate, db: Session
         db.refresh(db_member)
         m_dict = schemas.MemberSchema.from_orm(db_member).dict()
         m_dict["password"] = ""
+        m_dict["gender"] = db_member.gender or "Masculino"
         return m_dict
     except IntegrityError as e:
         db.rollback()

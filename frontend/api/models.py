@@ -13,6 +13,7 @@ class Member(Base):
     dni = Column(String, unique=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
+    gender = Column(String, default="Masculino", nullable=True)
     status = Column(String, default="ACTIVO") # ACTIVO, DEUDA, POR VENCER, INACTIVO
     photo_url = Column(String, nullable=True)
     phone = Column(String, nullable=True)

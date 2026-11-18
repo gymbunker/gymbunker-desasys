@@ -20,6 +20,7 @@ def auto_migrate():
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS fixed_billing_day INTEGER;",
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS keep_billing_day BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS gender VARCHAR DEFAULT 'Masculino';",
         "ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_date TIMESTAMP;",
         "ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_due_date TIMESTAMP;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS enable_custom_payment_methods BOOLEAN DEFAULT FALSE;",
