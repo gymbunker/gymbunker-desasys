@@ -3077,6 +3077,247 @@ function getCohortChartData(newMembers: any[], retainedMembers: any[], start: Da
   return months;
 }
 
+function GenderStatsSection({ members }: { members: any[] }) {
+  const [filterMode, setFilterMode] = useState<'all' | 'active'>('all');
+
+  const targetMembers = (members || []).filter((m: any) => {
+    if (filterMode === 'active') {
+      return m.status === 'ACTIVO' || m.status === 'AL DIA';
+    }
+    return true;
+  });
+
+  const total = targetMembers.length;
+
+  let maleCount = 0;
+  let femaleCount = 0;
+  let otherCount = 0;
+
+  targetMembers.forEach((m: any) => {
+    const raw = (m.gender || 'Masculino').trim().toLowerCase();
+    if (raw === 'femenino' || raw === 'mujer' || raw === 'f') {
+      femaleCount++;
+    } else if (raw === 'masculino' || raw === 'hombre' || raw === 'm') {
+      maleCount++;
+    } else {
+      otherCount++;
+    }
+  });
+
+  const malePct = total > 0 ? ((maleCount / total) * 100).toFixed(1) : '0';
+  const femalePct = total > 0 ? ((femaleCount / total) * 100).toFixed(1) : '0';
+  const otherPct = total > 0 ? ((otherCount / total) * 100).toFixed(1) : '0';
+
+  const chartData = [
+    { name: 'Masculino', value: maleCount, color: '#3b82f6', pct: malePct },
+    { name: 'Femenino', value: femaleCount, color: '#ec4899', pct: femalePct },
+    ...(otherCount > 0 ? [{ name: 'Otro', value: otherCount, color: '#8b5cf6', pct: otherPct }] : [])
+  ];
+
+  const displayData = chartData.length > 0 ? chartData : [
+    { name: 'Masculino', value: 0, color: '#3b82f6', pct: '0' },
+    { name: 'Femenino', value: 0, color: '#ec4899', pct: '0' }
+  ];
+
+  return (
+    <div className="bg-white dark:bg-white/5 p-5 rounded-2xl border border-gray-200 dark:border-white/5 space-y-4 shadow-sm">
+      {/* Header with Title and Mode Filter */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h3 className="text-xs font-black text-black dark:text-white uppercase tracking-wider flex items-center gap-2">
+            <Users size={15} className="text-orange-500" />
+            Distribución por Género
+          </h3>
+          <p className="text-[9px] text-gray-500 dark:text-white/40 font-bold">
+            Proporción de socios masculinos, femeninos y otros en la base del gimnasio.
+          </p>
+        </div>
+
+        {/* Scope Toggle: Todos vs Activos */}
+        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-black/30 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+          <button
+            type="button"
+            onClick={() => setFilterMode('all')}
+            className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${
+              filterMode === 'all'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-gray-500 dark:text-white/40 hover:text-black dark:hover:text-white'
+            }`}
+          >
+            Todos ({(members || []).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterMode('active')}
+            className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${
+              filterMode === 'active'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-gray-500 dark:text-white/40 hover:text-black dark:hover:text-white'
+            }`}
+          >
+            Solo Activos ({(members || []).filter((m: any) => m.status === 'ACTIVO' || m.status === 'AL DIA').length})
+          </button>
+        </div>
+      </div>
+
+      {/* Main Grid: Left Donut Chart, Right Visual Cards & Bars */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
+        {/* Left: Donut Chart with center total */}
+        <div className="h-52 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-white/5 flex flex-col justify-between relative">
+          <p className="text-[8px] font-black uppercase text-gray-400 dark:text-white/40 tracking-wider text-center">
+            Gráfico de Proporción
+          </p>
+          <div className="h-36 relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie 
+                  data={displayData} 
+                  innerRadius={40} 
+                  outerRadius={56} 
+                  paddingAngle={4} 
+                  dataKey="value"
+                >
+                  {displayData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(val: any, name: any, item: any) => [`${val} socios (${item?.payload?.pct}%)`, name]}
+                  contentStyle={{ backgroundColor: '#111', border: 'none', fontSize: '10px', borderRadius: '10px' }} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-base font-black text-black dark:text-white leading-none">{total}</span>
+              <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
+                {filterMode === 'all' ? 'SOCIOS' : 'ACTIVOS'}
+              </span>
+            </div>
+          </div>
+          <div className="flex justify-center gap-3 text-[8px] font-black uppercase text-gray-400 dark:text-white/40">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-blue-500" /> Masc: {malePct}%
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-pink-500" /> Fem: {femalePct}%
+            </span>
+            {otherCount > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-purple-500" /> Otro: {otherPct}%
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right (2 cols): Metric Cards & Progress Bars */}
+        <div className="lg:col-span-2 space-y-3">
+          {/* Card Masculino */}
+          <div className="bg-gray-50 dark:bg-black/20 p-3.5 rounded-xl border border-gray-200 dark:border-white/5 space-y-2 hover:border-blue-500/30 transition-all">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center justify-center font-black text-xs">
+                  ♂
+                </span>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-black dark:text-white block leading-tight">
+                    Masculino
+                  </span>
+                  <span className="text-[8px] text-gray-400 font-bold">
+                    Hombres registrados
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-black text-blue-500 block leading-tight">
+                  {maleCount.toLocaleString()}
+                </span>
+                <span className="text-[8px] font-black text-gray-400 uppercase">
+                  {malePct}% del total
+                </span>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-blue-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${Math.max(Number(malePct), maleCount > 0 ? 3 : 0)}%` }} 
+              />
+            </div>
+          </div>
+
+          {/* Card Femenino */}
+          <div className="bg-gray-50 dark:bg-black/20 p-3.5 rounded-xl border border-gray-200 dark:border-white/5 space-y-2 hover:border-pink-500/30 transition-all">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-pink-500/10 text-pink-500 border border-pink-500/20 flex items-center justify-center font-black text-xs">
+                  ♀
+                </span>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-black dark:text-white block leading-tight">
+                    Femenino
+                  </span>
+                  <span className="text-[8px] text-gray-400 font-bold">
+                    Mujeres registradas
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-black text-pink-500 block leading-tight">
+                  {femaleCount.toLocaleString()}
+                </span>
+                <span className="text-[8px] font-black text-gray-400 uppercase">
+                  {femalePct}% del total
+                </span>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-pink-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${Math.max(Number(femalePct), femaleCount > 0 ? 3 : 0)}%` }} 
+              />
+            </div>
+          </div>
+
+          {/* Card Otro */}
+          <div className="bg-gray-50 dark:bg-black/20 p-3.5 rounded-xl border border-gray-200 dark:border-white/5 space-y-2 hover:border-purple-500/30 transition-all">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 flex items-center justify-center font-black text-xs">
+                  ⚧
+                </span>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-black dark:text-white block leading-tight">
+                    Otro / No especificado
+                  </span>
+                  <span className="text-[8px] text-gray-400 font-bold">
+                    Otras identidades o sin especificar
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-black text-purple-500 block leading-tight">
+                  {otherCount.toLocaleString()}
+                </span>
+                <span className="text-[8px] font-black text-gray-400 uppercase">
+                  {otherPct}% del total
+                </span>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-purple-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${Math.max(Number(otherPct), otherCount > 0 ? 3 : 0)}%` }} 
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PaymentMethodsStatsSection({ 
   history, 
   startDate, 
@@ -3617,6 +3858,9 @@ function SummaryModule({ members, financeData, userRole, setActiveTab }: any) {
           />
         )}
       </div>
+
+      {/* Gráfico y métricas de Distribución por Género */}
+      <GenderStatsSection members={members} />
 
       {/* Gráfico y métricas de Métodos de Pago */}
       <PaymentMethodsStatsSection 
